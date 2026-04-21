@@ -1,6 +1,3909 @@
-<html>
+<!DOCTYPE html>
+<html lang="ko">
 <head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Code Repositories</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #03060c;
+    color: #e6e8ee;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Courier New', monospace;
+    cursor: none;
+  }
+  #canvas { position: fixed; inset: 0; z-index: 0; }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(100, 150, 220, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(100, 150, 220, 0.035) 1px, transparent 1px);
+    background-size: 80px 80px;
+    z-index: 1;
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(3, 6, 12, 0.85) 100%);
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .cursor {
+    position: fixed;
+    width: 28px; height: 28px;
+    border: 1px solid rgba(100, 200, 255, 0.6);
+    pointer-events: none;
+    transform: translate(-50%, -50%) rotate(45deg);
+    transition: width 0.3s, height 0.3s;
+    z-index: 1000;
+  }
+  .cursor-dot {
+    position: fixed;
+    width: 3px; height: 3px;
+    background: #64c8ff;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    box-shadow: 0 0 8px #64c8ff;
+  }
+
+  .corner {
+    position: fixed;
+    width: 24px; height: 24px;
+    border-color: rgba(100, 200, 255, 0.4);
+    border-style: solid;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .corner.tl { top: 32px; left: 32px; border-width: 1px 0 0 1px; }
+  .corner.tr { top: 32px; right: 32px; border-width: 1px 1px 0 0; }
+  .corner.bl { bottom: 32px; left: 32px; border-width: 0 0 1px 1px; }
+  .corner.br { bottom: 32px; right: 32px; border-width: 0 1px 1px 0; }
+
+  .ident {
+    position: fixed;
+    top: 32px; left: 68px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: rgba(100, 200, 255, 0.7);
+    text-transform: uppercase;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 24px;
+  }
+  .ident::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: #64c8ff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #64c8ff;
+    animation: pulse 2s infinite;
+  }
+
+  /* 소개 문구 */
+  .tagline {
+    position: fixed;
+    top: 72px; left: 68px;
+    z-index: 10;
+    pointer-events: none;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  .tagline .line {
+    font-size: 28px;
+    font-weight: 200;
+    line-height: 1;
+    color: rgba(230, 232, 238, 0.95);
+    letter-spacing: -0.5px;
+    opacity: 0;
+    animation: taglineIn 1.2s 0.4s forwards;
+  }
+
+  @keyframes taglineIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .coord {
+    position: fixed;
+    top: 32px; right: 68px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(150, 170, 200, 0.5);
+    text-transform: uppercase;
+    z-index: 10;
+    pointer-events: none;
+    text-align: right;
+    height: 24px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* 노드 호버 시 나타나는 라벨 */
+  .label {
+    position: fixed;
+    top: 0; left: 0;
+    padding: 6px 12px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #64c8ff;
+    background: rgba(3, 6, 12, 0.85);
+    border: 1px solid rgba(100, 200, 255, 0.4);
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.2s;
+    transform: translate(12px, 12px);
+    white-space: nowrap;
+  }
+  .label.show { opacity: 1; }
+
+  .hint {
+    position: fixed;
+    bottom: 32px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: rgba(150, 170, 200, 0.4);
+    text-transform: uppercase;
+    z-index: 10;
+    pointer-events: none;
+    animation: fadeBlink 4s infinite;
+  }
+
+  .scanline {
+    position: fixed;
+    left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100, 200, 255, 0.3), transparent);
+    z-index: 3;
+    pointer-events: none;
+    animation: scan 10s linear infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  @keyframes fadeBlink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+  @keyframes scan {
+    0% { top: 0%; }
+    100% { top: 100%; }
+  }
+
+  @media (max-width: 600px) {
+    .corner.tl, .ident { top: 20px; }
+    .corner.tl { left: 20px; }
+    .ident { left: 56px; font-size: 9px; letter-spacing: 2px; }
+    .corner.tr, .coord { top: 20px; }
+    .corner.tr { right: 20px; }
+    .coord { right: 56px; font-size: 9px; }
+    .corner.bl { bottom: 20px; left: 20px; }
+    .corner.br { bottom: 20px; right: 20px; }
+    .hint { bottom: 20px; font-size: 8px; letter-spacing: 3px; }
+    .tagline { top: 50px; left: 20px; }
+    .tagline .line { font-size: 22px; }
+  }
+</style>
 </head>
 <body>
+
+<canvas id="canvas"></canvas>
+<div class="scanline"></div>
+
+<div class="cursor"></div>
+<div class="cursor-dot"></div>
+
+<div class="corner tl"></div>
+<div class="corner tr"></div>
+<div class="corner bl"></div>
+<div class="corner br"></div>
+
+<div class="ident">CODE · REPOSITORIES</div>
+
+<div class="tagline">
+  <div class="line l1">code-repositories</div>
+</div>
+
+<div class="coord" id="coord">SYS.LOADING</div>
+<div class="hint">— Move · Drag · Hover nodes —</div>
+
+<div class="label" id="label"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  // ============ 커스텀 커서 ============
+  const cursor = document.querySelector('.cursor');
+  const cursorDot = document.querySelector('.cursor-dot');
+  const label = document.getElementById('label');
+  let mouseX = window.innerWidth / 2;
+  let mouseY = window.innerHeight / 2;
+  let cursorX = mouseX, cursorY = mouseY;
+
+  window.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX; mouseY = e.clientY;
+    cursorDot.style.left = mouseX + 'px';
+    cursorDot.style.top = mouseY + 'px';
+    label.style.left = mouseX + 'px';
+    label.style.top = mouseY + 'px';
+  });
+  (function animCursor() {
+    cursorX += (mouseX - cursorX) * 0.2;
+    cursorY += (mouseY - cursorY) * 0.2;
+    cursor.style.left = cursorX + 'px';
+    cursor.style.top = cursorY + 'px';
+    requestAnimationFrame(animCursor);
+  })();
+
+  // ============ Three.js ============
+  const canvas = document.getElementById('canvas');
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x03060c, 0.015);
+
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 0, 22);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  scene.add(new THREE.AmbientLight(0x4466aa, 0.5));
+  const pointLight = new THREE.PointLight(0x64c8ff, 2, 40);
+  scene.add(pointLight);
+
+  // ============ 중앙 허브 ============
+  const hubGroup = new THREE.Group();
+  scene.add(hubGroup);
+
+  const core = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.75, 0),
+    new THREE.MeshBasicMaterial({ color: 0x64c8ff, transparent: true, opacity: 0.85 })
+  );
+  hubGroup.add(core);
+
+  hubGroup.add(new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.78, 0),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.7 })
+  ));
+
+  const shell = new THREE.Mesh(
+    new THREE.OctahedronGeometry(1.4, 0),
+    new THREE.MeshBasicMaterial({ color: 0x64c8ff, wireframe: true, transparent: true, opacity: 0.35 })
+  );
+  hubGroup.add(shell);
+
+  const hubRings = [];
+  for (let i = 0; i < 3; i++) {
+    const r = 1.8 + i * 0.3;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(r, 0.008, 8, 128),
+      new THREE.MeshBasicMaterial({ color: 0x64c8ff, transparent: true, opacity: 0.5 - i * 0.12 })
+    );
+    ring.rotation.x = Math.random() * Math.PI;
+    ring.rotation.y = Math.random() * Math.PI;
+    ring.userData.sx = 0.003 + Math.random() * 0.004;
+    ring.userData.sy = 0.002 + Math.random() * 0.003;
+    hubGroup.add(ring);
+    hubRings.push(ring);
+  }
+
+  // ============ 영역별 3D 아이콘 빌더 함수들 ============
+  const WIRE_WHITE = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
+  const MAIN_BLUE = 0xa8d8ff;
+  const ACCENT = 0x64c8ff;
+  const DEV_GREEN = 0x4ade80;
+  const WARM = 0xffb86c;
+
+  // 1. 디지털 트윈 — 실물 큐브 + 와이어 큐브 쌍둥이
+  function buildDigitalTwin() {
+    const g = new THREE.Group();
+    const solid = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.35, 0.35),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+    );
+    solid.position.x = -0.22;
+    solid.add(new THREE.LineSegments(new THREE.EdgesGeometry(solid.geometry), WIRE_WHITE));
+    g.add(solid);
+
+    const wire = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.35, 0.35),
+      new THREE.MeshBasicMaterial({ color: ACCENT, wireframe: true, transparent: true, opacity: 0.8 })
+    );
+    wire.position.x = 0.22;
+    g.add(wire);
+
+    // 연결 라인
+    const linkGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.05, 0, 0), new THREE.Vector3(0.05, 0, 0)
+    ]);
+    g.add(new THREE.Line(linkGeo, new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 })));
+    return g;
+  }
+
+  // 2. 스마트 팩토리 — 기어 + 톱니
+  function buildSmartFactory() {
+    const g = new THREE.Group();
+    // 메인 기어 (원통 + 이빨)
+    const gear = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.3, 0.1, 12),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+    );
+    gear.rotation.x = Math.PI / 2;
+    gear.add(new THREE.LineSegments(new THREE.EdgesGeometry(gear.geometry), WIRE_WHITE));
+    g.add(gear);
+
+    // 톱니 8개
+    for (let i = 0; i < 8; i++) {
+      const tooth = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.08, 0.12),
+        new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+      );
+      const a = (i / 8) * Math.PI * 2;
+      tooth.position.x = Math.cos(a) * 0.32;
+      tooth.position.y = Math.sin(a) * 0.32;
+      g.add(tooth);
+    }
+
+    // 중심 축
+    const axis = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.2, 8),
+      new THREE.MeshBasicMaterial({ color: ACCENT })
+    );
+    axis.rotation.x = Math.PI / 2;
+    g.add(axis);
+
+    g.userData.spin = true;
+    return g;
+  }
+
+  // 3. 금융 — 상승 막대 차트 + 화살표
+  function buildFinance() {
+    const g = new THREE.Group();
+    const heights = [0.2, 0.35, 0.3, 0.5];
+    heights.forEach((h, i) => {
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.09, h, 0.09),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+      );
+      bar.position.x = -0.2 + i * 0.13;
+      bar.position.y = h / 2 - 0.25;
+      bar.add(new THREE.LineSegments(new THREE.EdgesGeometry(bar.geometry), WIRE_WHITE));
+      g.add(bar);
+    });
+
+    // 상승 화살표 라인
+    const arrowGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.25, -0.15, 0.1),
+      new THREE.Vector3(0.25, 0.3, 0.1)
+    ]);
+    g.add(new THREE.Line(arrowGeo, new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })));
+
+    // 화살촉
+    const headGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0.25, 0.3, 0.1),
+      new THREE.Vector3(0.15, 0.28, 0.1),
+      new THREE.Vector3(0.25, 0.3, 0.1),
+      new THREE.Vector3(0.23, 0.18, 0.1)
+    ]);
+    g.add(new THREE.Line(headGeo, new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })));
+    return g;
+  }
+
+  // 4. 선형대수 — 3D 좌표축 (벡터 3개)
+  function buildLinearAlgebra() {
+    const g = new THREE.Group();
+    const axes = [
+      { dir: new THREE.Vector3(1, 0, 0), color: 0xff6b8b },
+      { dir: new THREE.Vector3(0, 1, 0), color: 0x4ade80 },
+      { dir: new THREE.Vector3(0, 0, 1), color: ACCENT }
+    ];
+    axes.forEach(ax => {
+      const end = ax.dir.clone().multiplyScalar(0.35);
+      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), end]);
+      g.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: ax.color, transparent: true, opacity: 0.9 })));
+
+      // 끝점 구
+      const tip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.035, 8, 8),
+        new THREE.MeshBasicMaterial({ color: ax.color })
+      );
+      tip.position.copy(end);
+      g.add(tip);
+    });
+    // 원점 구
+    g.add(new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    ));
+
+    // 부피 표시용 투명 큐브
+    const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.35, 0.35),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, wireframe: true, transparent: true, opacity: 0.25 })
+    );
+    cube.position.set(0.175, 0.175, 0.175);
+    g.add(cube);
+    return g;
+  }
+
+  // 5. 미적분 — ∫ 곡선 + 적분 영역 (곡선 아래 면)
+  function buildCalculus() {
+    const g = new THREE.Group();
+    // 곡선 (사인파)
+    const curvePts = [];
+    for (let i = 0; i <= 40; i++) {
+      const x = -0.4 + (i / 40) * 0.8;
+      const y = Math.sin(x * 5) * 0.15 + 0.05;
+      curvePts.push(new THREE.Vector3(x, y, 0));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(curvePts),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    ));
+
+    // 적분 영역 막대 (리만 합)
+    for (let i = 0; i < 10; i++) {
+      const x = -0.4 + (i / 10) * 0.8 + 0.04;
+      const y = Math.sin(x * 5) * 0.15 + 0.05;
+      const h = y + 0.25;
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.075, h, 0.02),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.4 })
+      );
+      bar.position.set(x, y / 2 - 0.1, 0);
+      g.add(bar);
+    }
+
+    // x축
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.45, -0.25, 0), new THREE.Vector3(0.45, -0.25, 0)
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+    ));
+    return g;
+  }
+
+  // 6. 개발 언어 — 중괄호 + 세미콜론 느낌 (< / >)
+  function buildLanguages() {
+    const g = new THREE.Group();
+    const mat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95, linewidth: 2 });
+
+    // 왼쪽 < 꺾쇠
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.1, 0.25, 0),
+      new THREE.Vector3(-0.3, 0, 0),
+      new THREE.Vector3(-0.1, -0.25, 0)
+    ]), mat));
+
+    // 오른쪽 > 꺾쇠
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0.1, 0.25, 0),
+      new THREE.Vector3(0.3, 0, 0),
+      new THREE.Vector3(0.1, -0.25, 0)
+    ]), mat));
+
+    // 슬래시
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0.08, 0.3, 0),
+      new THREE.Vector3(-0.08, -0.3, 0)
+    ]), new THREE.LineBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })));
+    return g;
+  }
+
+  // 7. 웹 — 지구 와이어프레임 (경위도 라인)
+  function buildWeb() {
+    const g = new THREE.Group();
+    const globe = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 16, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT, wireframe: true, transparent: true, opacity: 0.8 })
+    );
+    g.add(globe);
+
+    const inner = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 12, 8),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.2 })
+    );
+    g.add(inner);
+
+    // 연결 핀 3개
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      const pin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.04, 8, 8),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+      );
+      pin.position.set(Math.cos(a) * 0.3, Math.sin(a) * 0.15, Math.sin(a) * 0.3);
+      g.add(pin);
+    }
+
+    g.userData.spin = true;
+    return g;
+  }
+
+  // 8. 안드로이드 — 로봇 머리 (반구 + 안테나 + 눈)
+  function buildAndroid() {
+    const g = new THREE.Group();
+    // 머리 (반구)
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.85 })
+    );
+    head.add(new THREE.LineSegments(new THREE.EdgesGeometry(head.geometry), WIRE_WHITE));
+    g.add(head);
+
+    // 바닥 원판
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.3, 0.02, 16),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+    );
+    base.position.y = -0.01;
+    g.add(base);
+
+    // 안테나 2개
+    [-0.15, 0.15].forEach(x => {
+      const ant = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.015, 0.15, 6),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+      );
+      ant.position.set(x, 0.35, 0);
+      ant.rotation.z = x > 0 ? -0.3 : 0.3;
+      g.add(ant);
+
+      const tip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.03, 8, 8),
+        new THREE.MeshBasicMaterial({ color: ACCENT })
+      );
+      tip.position.set(x + (x > 0 ? 0.04 : -0.04), 0.43, 0);
+      g.add(tip);
+    });
+
+    // 눈 2개
+    [-0.1, 0.1].forEach(x => {
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.04, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      eye.position.set(x, 0.15, 0.22);
+      g.add(eye);
+    });
+    return g;
+  }
+
+  // 9. 리눅스 — 터미널 창 (모니터 + 프롬프트 커서)
+  function buildLinux() {
+    const g = new THREE.Group();
+    // 모니터 프레임
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 0.4, 0.04),
+      new THREE.MeshBasicMaterial({ color: 0x1a2030, transparent: true, opacity: 0.95 })
+    );
+    frame.add(new THREE.LineSegments(new THREE.EdgesGeometry(frame.geometry),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.8 })
+    ));
+    g.add(frame);
+
+    // 화면 내부
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.48, 0.33),
+      new THREE.MeshBasicMaterial({ color: 0x050810, transparent: true, opacity: 0.9 })
+    );
+    screen.position.z = 0.021;
+    g.add(screen);
+
+    // 프롬프트 기호 >_
+    const prompt = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.015, 0.005),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    prompt.position.set(-0.18, 0.05, 0.024);
+    g.add(prompt);
+
+    // 커서 (깜빡임)
+    const blinker = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.07, 0.005),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+    );
+    blinker.position.set(-0.1, 0.05, 0.024);
+    g.add(blinker);
+    g.userData.blinker = blinker;
+
+    // 스탠드
+    const stand = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.08, 0.03),
+      new THREE.MeshBasicMaterial({ color: 0x1a2030 })
+    );
+    stand.position.y = -0.25;
+    g.add(stand);
+    return g;
+  }
+
+  // 10. 로봇 소프트웨어 — 로봇팔 (관절 3개)
+  function buildRobotSoftware() {
+    const g = new THREE.Group();
+
+    // 베이스
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.12, 0.06, 12),
+      new THREE.MeshBasicMaterial({ color: WARM, transparent: true, opacity: 0.9 })
+    );
+    base.position.y = -0.25;
+    g.add(base);
+
+    // 1번 관절 (구)
+    const joint1 = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 12, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT })
+    );
+    joint1.position.y = -0.2;
+    g.add(joint1);
+
+    // 1번 암 (세로)
+    const arm1 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.2, 0.06),
+      new THREE.MeshBasicMaterial({ color: WARM, transparent: true, opacity: 0.9 })
+    );
+    arm1.position.y = -0.08;
+    arm1.add(new THREE.LineSegments(new THREE.EdgesGeometry(arm1.geometry), WIRE_WHITE));
+    g.add(arm1);
+
+    // 2번 관절
+    const joint2 = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 12, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT })
+    );
+    joint2.position.y = 0.05;
+    g.add(joint2);
+
+    // 2번 암 (대각선)
+    const arm2 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.22, 0.05),
+      new THREE.MeshBasicMaterial({ color: WARM, transparent: true, opacity: 0.9 })
+    );
+    arm2.position.set(0.08, 0.15, 0);
+    arm2.rotation.z = -0.7;
+    arm2.add(new THREE.LineSegments(new THREE.EdgesGeometry(arm2.geometry), WIRE_WHITE));
+    g.add(arm2);
+
+    // 그리퍼
+    const gripper = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.04, 0.04),
+      new THREE.MeshBasicMaterial({ color: ACCENT })
+    );
+    gripper.position.set(0.22, 0.26, 0);
+    g.add(gripper);
+
+    g.userData.arm = arm2;
+    g.userData.armPivot = joint2;
+    return g;
+  }
+
+  // 11. ADP (Advanced Data Analytics Professional) — 산점도 + 회귀선 + 분포 곡선
+  function buildADP() {
+    const g = new THREE.Group();
+
+    // 좌표평면 (얇은 판)
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.6, 0.5),
+      new THREE.MeshBasicMaterial({ color: 0x0a1528, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+    );
+    g.add(plane);
+
+    // 격자 라인
+    const gridMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.25 });
+    for (let i = -2; i <= 2; i++) {
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-0.3, i * 0.1, 0.001), new THREE.Vector3(0.3, i * 0.1, 0.001)
+        ]), gridMat));
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(i * 0.1, -0.25, 0.001), new THREE.Vector3(i * 0.1, 0.25, 0.001)
+        ]), gridMat));
+    }
+
+    // 산점도 (데이터 포인트 15개, 선형 트렌드 + 노이즈)
+    const points = [];
+    for (let i = 0; i < 15; i++) {
+      const x = -0.25 + Math.random() * 0.5;
+      const noise = (Math.random() - 0.5) * 0.12;
+      const y = x * 0.7 + noise;
+      points.push({ x, y });
+
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 8, 8),
+        new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+      );
+      dot.position.set(x, y, 0.02);
+      g.add(dot);
+    }
+
+    // 회귀선 (녹색)
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.28, -0.2, 0.015),
+        new THREE.Vector3(0.28, 0.2, 0.015)
+      ]),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+    ));
+
+    // 상단 분포 곡선 (정규분포 느낌)
+    const dist = [];
+    for (let i = 0; i <= 30; i++) {
+      const x = -0.3 + (i / 30) * 0.6;
+      const y = 0.3 + Math.exp(-x * x * 40) * 0.12;
+      dist.push(new THREE.Vector3(x, y, 0.01));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(dist),
+      new THREE.LineBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.8 })
+    ));
+
+    // 프레임
+    g.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.6, 0.5)),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 })
+    ));
+
+    return g;
+  }
+
+  // 12. DAP (Data Architecture Professional) — 3층 레이어드 데이터 아키텍처
+  function buildDAP() {
+    const g = new THREE.Group();
+
+    // 3개 레이어 (Source → Warehouse → Mart 느낌)
+    const layerConfig = [
+      { y: -0.22, w: 0.55, color: MAIN_BLUE },     // Source layer (넓음)
+      { y: 0,    w: 0.4,  color: ACCENT },          // Integration layer
+      { y: 0.22, w: 0.25, color: DEV_GREEN }        // Mart layer (좁음 - 정제됨)
+    ];
+
+    layerConfig.forEach(layer => {
+      // 원판 (레이어 본체)
+      const disk = new THREE.Mesh(
+        new THREE.CylinderGeometry(layer.w, layer.w, 0.05, 16),
+        new THREE.MeshBasicMaterial({ color: layer.color, transparent: true, opacity: 0.6 })
+      );
+      disk.position.y = layer.y;
+      g.add(disk);
+
+      // 원판 테두리
+      disk.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(disk.geometry),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })
+      ));
+
+      // 각 레이어 위에 데이터 블록 3-4개
+      const count = layer.w > 0.4 ? 4 : (layer.w > 0.3 ? 3 : 2);
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        const block = new THREE.Mesh(
+          new THREE.BoxGeometry(0.07, 0.06, 0.07),
+          new THREE.MeshBasicMaterial({ color: layer.color, transparent: true, opacity: 0.9 })
+        );
+        block.position.set(
+          Math.cos(a) * (layer.w - 0.1),
+          layer.y + 0.05,
+          Math.sin(a) * (layer.w - 0.1)
+        );
+        block.add(new THREE.LineSegments(new THREE.EdgesGeometry(block.geometry), WIRE_WHITE));
+        g.add(block);
+      }
+    });
+
+    // 레이어 간 연결 기둥 (데이터 흐름)
+    const pillarMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 });
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      const r = 0.15;
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(Math.cos(a) * r, -0.2, Math.sin(a) * r),
+          new THREE.Vector3(Math.cos(a) * r, 0.2, Math.sin(a) * r)
+        ]), pillarMat
+      ));
+    }
+
+    // 중심축
+    const axis = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.5, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })
+    );
+    g.add(axis);
+
+    return g;
+  }
+
+  // 13. SQLP (SQL Professional) — 데이터베이스 실린더 + 쿼리 라인
+  function buildSQLP() {
+    const g = new THREE.Group();
+
+    // 메인 데이터베이스 실린더 (3단 디스크 적층)
+    for (let i = 0; i < 3; i++) {
+      const disk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.22, 0.12, 20),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.85 })
+      );
+      disk.position.y = -0.2 + i * 0.13;
+      g.add(disk);
+
+      // 각 디스크 상단 타원 테두리
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.22, 0.005, 8, 32),
+        new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = -0.2 + i * 0.13 + 0.06;
+      g.add(ring);
+
+      // 각 디스크 하단 타원
+      const ringB = new THREE.Mesh(
+        new THREE.TorusGeometry(0.22, 0.004, 8, 32),
+        new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.5 })
+      );
+      ringB.rotation.x = Math.PI / 2;
+      ringB.position.y = -0.2 + i * 0.13 - 0.06;
+      g.add(ringB);
+    }
+
+    // 실린더 엣지 라인 (세로)
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 });
+    [0, Math.PI].forEach(a => {
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(Math.cos(a) * 0.22, -0.26, Math.sin(a) * 0.22),
+          new THREE.Vector3(Math.cos(a) * 0.22, 0.19, Math.sin(a) * 0.22)
+        ]), edgeMat
+      ));
+    });
+
+    // SELECT 쿼리 흐름 (상단에서 DB로 들어가는 화살표)
+    const queryMat = new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 });
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.4, 0.35, 0),
+        new THREE.Vector3(-0.1, 0.22, 0)
+      ]), queryMat
+    ));
+    // 화살촉
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.1, 0.22, 0),
+        new THREE.Vector3(-0.16, 0.25, 0),
+        new THREE.Vector3(-0.1, 0.22, 0),
+        new THREE.Vector3(-0.18, 0.18, 0)
+      ]), queryMat
+    ));
+
+    // 결과 반환 (DB에서 오른쪽으로 나가는 데이터)
+    const resultMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 });
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0.1, -0.1, 0),
+        new THREE.Vector3(0.4, -0.25, 0)
+      ]), resultMat
+    ));
+    // 결과 데이터 포인트 3개
+    for (let i = 0; i < 3; i++) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 8, 8),
+        new THREE.MeshBasicMaterial({ color: ACCENT })
+      );
+      dot.position.set(0.2 + i * 0.08, -0.15 - i * 0.04, 0);
+      g.add(dot);
+    }
+
+    return g;
+  }
+
+  // 14. 네트워크 — 중앙 라우터 + 주변 노드들 + 패킷 흐름
+  function buildNetwork() {
+    const g = new THREE.Group();
+
+    // 중앙 라우터 (정육면체)
+    const router = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.12, 0.18),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    router.add(new THREE.LineSegments(new THREE.EdgesGeometry(router.geometry), WIRE_WHITE));
+    g.add(router);
+
+    // 라우터 안테나
+    const antenna = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.008, 0.12, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    antenna.position.y = 0.12;
+    g.add(antenna);
+    const antTip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 8, 8),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    antTip.position.y = 0.19;
+    g.add(antTip);
+
+    // 5개의 연결 노드 (주변)
+    const nodePositions = [
+      new THREE.Vector3(-0.35, 0.25, 0),
+      new THREE.Vector3(0.35, 0.25, 0),
+      new THREE.Vector3(-0.35, -0.25, 0),
+      new THREE.Vector3(0.35, -0.25, 0),
+      new THREE.Vector3(0, -0.35, 0.2)
+    ];
+
+    const linkMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 });
+    nodePositions.forEach((pos, i) => {
+      // 노드 구
+      const node = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 10, 10),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+      );
+      node.position.copy(pos);
+      g.add(node);
+
+      // 연결선
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0), pos
+        ]), linkMat
+      ));
+
+      // 패킷 (연결선 중간에 작은 큐브)
+      const packet = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.03, 0.03),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+      );
+      packet.userData = { from: new THREE.Vector3(0,0,0), to: pos.clone(), t: Math.random() };
+      g.add(packet);
+      if (!g.userData.packets) g.userData.packets = [];
+      g.userData.packets.push(packet);
+    });
+
+    // 포트 LED 3개 (라우터 앞면)
+    for (let i = 0; i < 3; i++) {
+      const led = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 6, 6),
+        new THREE.MeshBasicMaterial({ color: i === 1 ? WARM : DEV_GREEN })
+      );
+      led.position.set(-0.05 + i * 0.05, 0, 0.09);
+      g.add(led);
+    }
+
+    return g;
+  }
+
+  // 15. 게임 — 게임패드 + D-pad + 버튼들
+  function buildGame() {
+    const g = new THREE.Group();
+
+    // 컨트롤러 본체 (양쪽 둥근 형태를 박스 2개로 표현)
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 0.2, 0.1),
+      new THREE.MeshBasicMaterial({ color: 0x1a2030, transparent: true, opacity: 0.95 })
+    );
+    body.add(new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.8 })
+    ));
+    g.add(body);
+
+    // 좌측 그립 (둥근 느낌)
+    const leftGrip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0x1a2030 })
+    );
+    leftGrip.position.set(-0.25, -0.08, 0);
+    leftGrip.scale.set(1, 0.8, 0.8);
+    g.add(leftGrip);
+
+    // 우측 그립
+    const rightGrip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0x1a2030 })
+    );
+    rightGrip.position.set(0.25, -0.08, 0);
+    rightGrip.scale.set(1, 0.8, 0.8);
+    g.add(rightGrip);
+
+    // D-Pad (십자) - 왼쪽
+    const dPadH = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.03, 0.03),
+      new THREE.MeshBasicMaterial({ color: ACCENT })
+    );
+    dPadH.position.set(-0.18, 0.02, 0.06);
+    g.add(dPadH);
+    const dPadV = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.1, 0.03),
+      new THREE.MeshBasicMaterial({ color: ACCENT })
+    );
+    dPadV.position.set(-0.18, 0.02, 0.06);
+    g.add(dPadV);
+
+    // ABXY 버튼 4개 (오른쪽, 다이아몬드 배치) - 각기 다른 색
+    const buttonColors = [0xff6b8b, DEV_GREEN, ACCENT, WARM];
+    const btnPositions = [
+      { x: 0.18, y: 0.07 },   // 위 (Y)
+      { x: 0.24, y: 0.02 },   // 오른쪽 (B)
+      { x: 0.18, y: -0.03 },  // 아래 (A)
+      { x: 0.12, y: 0.02 }    // 왼쪽 (X)
+    ];
+    btnPositions.forEach((p, i) => {
+      const btn = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.025, 0.02, 12),
+        new THREE.MeshBasicMaterial({ color: buttonColors[i], transparent: true, opacity: 0.95 })
+      );
+      btn.rotation.x = Math.PI / 2;
+      btn.position.set(p.x, p.y, 0.06);
+      g.add(btn);
+    });
+
+    // 아날로그 스틱 2개
+    [-0.06, 0.06].forEach(x => {
+      const stickBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.035, 0.015, 12),
+        new THREE.MeshBasicMaterial({ color: 0x2a3550 })
+      );
+      stickBase.rotation.x = Math.PI / 2;
+      stickBase.position.set(x, -0.05, 0.06);
+      g.add(stickBase);
+
+      const stickTop = new THREE.Mesh(
+        new THREE.SphereGeometry(0.022, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0x3a4560 })
+      );
+      stickTop.position.set(x, -0.05, 0.08);
+      g.add(stickTop);
+    });
+
+    // 중앙 로고 / 홈 버튼
+    const home = new THREE.Mesh(
+      new THREE.SphereGeometry(0.015, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    home.position.set(0, 0.02, 0.06);
+    g.add(home);
+
+    return g;
+  }
+
+  // 16. 서버 PC — 랙 마운트 서버 (다중 유닛 적층)
+  function buildServer() {
+    const g = new THREE.Group();
+
+    // 랙 프레임 (바깥 케이스)
+    const rack = new THREE.Mesh(
+      new THREE.BoxGeometry(0.45, 0.6, 0.3),
+      new THREE.MeshBasicMaterial({ color: 0x0a1020, transparent: true, opacity: 0.4 })
+    );
+    rack.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(rack.geometry),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 })
+    ));
+    g.add(rack);
+
+    // 서버 유닛 4개 (수평 슬라이스)
+    for (let i = 0; i < 4; i++) {
+      const yPos = -0.22 + i * 0.13;
+
+      // 서버 본체
+      const unit = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.1, 0.28),
+        new THREE.MeshBasicMaterial({ color: 0x1a2540, transparent: true, opacity: 0.95 })
+      );
+      unit.position.y = yPos;
+      unit.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(unit.geometry),
+        new THREE.LineBasicMaterial({ color: 0x5a7aa0, transparent: true, opacity: 0.7 })
+      ));
+      g.add(unit);
+
+      // 전면 LED 패널 (초록색 동작 표시등)
+      for (let j = 0; j < 4; j++) {
+        const led = new THREE.Mesh(
+          new THREE.SphereGeometry(0.009, 6, 6),
+          new THREE.MeshBasicMaterial({
+            color: j === 0 ? WARM : DEV_GREEN,
+            transparent: true,
+            opacity: 0.95
+          })
+        );
+        led.position.set(-0.17 + j * 0.025, yPos, 0.145);
+        led.userData.ledIdx = j;
+        led.userData.phase = Math.random() * Math.PI * 2;
+        g.add(led);
+        if (!g.userData.leds) g.userData.leds = [];
+        g.userData.leds.push(led);
+      }
+
+      // 전면 슬릿 (환기구) - 작은 수직 바
+      for (let j = 0; j < 6; j++) {
+        const slit = new THREE.Mesh(
+          new THREE.BoxGeometry(0.003, 0.06, 0.005),
+          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 })
+        );
+        slit.position.set(0.0 + j * 0.015, yPos, 0.141);
+        g.add(slit);
+      }
+
+      // 후면 포트 느낌 (뒤쪽 작은 큐브)
+      const port = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.04, 0.005),
+        new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 })
+      );
+      port.position.set(0, yPos, -0.145);
+      g.add(port);
+    }
+
+    // 상단 네트워크 케이블 (구부러진 라인 3개)
+    const cableMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.5 });
+    for (let i = 0; i < 3; i++) {
+      const startX = -0.1 + i * 0.1;
+      const cablePts = [];
+      for (let j = 0; j <= 20; j++) {
+        const t = j / 20;
+        cablePts.push(new THREE.Vector3(
+          startX + t * 0.05,
+          0.35 + Math.sin(t * Math.PI) * 0.08,
+          0.14 - t * 0.15
+        ));
+      }
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(cablePts),
+        cableMat
+      ));
+    }
+
+    return g;
+  }
+
+  // 17. 실시간 시스템 — 클럭 + 타이밍 다이어그램 + 스케줄러
+  function buildRealtime() {
+    const g = new THREE.Group();
+
+    // 중앙 클럭 (시계 느낌의 원판)
+    const clockFace = new THREE.Mesh(
+      new THREE.CircleGeometry(0.22, 32),
+      new THREE.MeshBasicMaterial({ color: 0x0a1528, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+    );
+    g.add(clockFace);
+
+    // 클럭 테두리
+    const clockRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.22, 0.008, 8, 48),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    g.add(clockRim);
+
+    // 12개 눈금 (시간 마커)
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+      const isMajor = i % 3 === 0;
+      const tick = new THREE.Mesh(
+        new THREE.BoxGeometry(isMajor ? 0.012 : 0.006, isMajor ? 0.03 : 0.02, 0.005),
+        new THREE.MeshBasicMaterial({
+          color: isMajor ? 0xffffff : ACCENT,
+          transparent: true,
+          opacity: isMajor ? 0.95 : 0.6
+        })
+      );
+      tick.position.set(Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0.002);
+      tick.rotation.z = a + Math.PI / 2;
+      g.add(tick);
+    }
+
+    // 분침 (빠르게 도는 긴 바늘) - 녹색 (태스크 실행)
+    const minuteHand = new THREE.Mesh(
+      new THREE.BoxGeometry(0.007, 0.18, 0.006),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.95 })
+    );
+    minuteHand.position.y = 0.07;
+    minuteHand.position.z = 0.006;
+    const minuteGroup = new THREE.Group();
+    minuteGroup.add(minuteHand);
+    g.add(minuteGroup);
+    g.userData.minuteHand = minuteGroup;
+
+    // 시침 (느린 짧은 바늘) - 주황 (데드라인)
+    const hourHand = new THREE.Mesh(
+      new THREE.BoxGeometry(0.009, 0.12, 0.006),
+      new THREE.MeshBasicMaterial({ color: WARM, transparent: true, opacity: 0.95 })
+    );
+    hourHand.position.y = 0.05;
+    hourHand.position.z = 0.008;
+    const hourGroup = new THREE.Group();
+    hourGroup.add(hourHand);
+    g.add(hourGroup);
+    g.userData.hourHand = hourGroup;
+
+    // 초침 (가장 빠른 얇은 바늘) - 빨강 (인터럽트)
+    const secondHand = new THREE.Mesh(
+      new THREE.BoxGeometry(0.003, 0.2, 0.004),
+      new THREE.MeshBasicMaterial({ color: 0xff6b8b, transparent: true, opacity: 0.9 })
+    );
+    secondHand.position.y = 0.08;
+    secondHand.position.z = 0.01;
+    const secondGroup = new THREE.Group();
+    secondGroup.add(secondHand);
+    g.add(secondGroup);
+    g.userData.secondHand = secondGroup;
+
+    // 중심 축
+    g.add(new THREE.Mesh(
+      new THREE.SphereGeometry(0.02, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    ));
+
+    // 타이밍 다이어그램 (하단 - 디지털 신호 파형)
+    const waveY = -0.36;
+    const waveMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.8 });
+    // 사각파 (태스크 실행 주기)
+    const wavePts = [];
+    let high = false;
+    for (let i = 0; i <= 20; i++) {
+      const x = -0.28 + (i / 20) * 0.56;
+      wavePts.push(new THREE.Vector3(x, waveY + (high ? 0.04 : 0), 0));
+      if (i % 2 === 1) {
+        wavePts.push(new THREE.Vector3(x, waveY + (high ? 0 : 0.04), 0));
+        high = !high;
+      }
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(wavePts),
+      waveMat
+    ));
+
+    // 데드라인 마커 (작은 빨간 삼각형들)
+    for (let i = 0; i < 3; i++) {
+      const x = -0.2 + i * 0.2;
+      const dlMat = new THREE.LineBasicMaterial({ color: 0xff6b8b, transparent: true, opacity: 0.9 });
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x, waveY - 0.05, 0),
+          new THREE.Vector3(x - 0.015, waveY - 0.08, 0),
+          new THREE.Vector3(x + 0.015, waveY - 0.08, 0),
+          new THREE.Vector3(x, waveY - 0.05, 0)
+        ]),
+        dlMat
+      ));
+    }
+
+    // 상단 태스크 큐 (작은 블록 3개)
+    for (let i = 0; i < 3; i++) {
+      const task = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.04, 0.02),
+        new THREE.MeshBasicMaterial({
+          color: [DEV_GREEN, WARM, 0xff6b8b][i],
+          transparent: true,
+          opacity: 0.9
+        })
+      );
+      task.position.set(-0.07 + i * 0.07, 0.34, 0);
+      task.add(new THREE.LineSegments(new THREE.EdgesGeometry(task.geometry), WIRE_WHITE));
+      g.add(task);
+    }
+
+    return g;
+  }
+
+  // 18. 자율주행 — 차량 + LiDAR 스캔 + 감지 영역
+  function buildAutonomous() {
+    const g = new THREE.Group();
+
+    // 차량 본체 (납작한 박스)
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.45, 0.1, 0.22),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+    );
+    body.position.y = -0.05;
+    body.add(new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry), WIRE_WHITE));
+    g.add(body);
+
+    // 캐빈 (상부)
+    const cabin = new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 0.08, 0.2),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 })
+    );
+    cabin.position.set(-0.02, 0.04, 0);
+    cabin.add(new THREE.LineSegments(new THREE.EdgesGeometry(cabin.geometry), WIRE_WHITE));
+    g.add(cabin);
+
+    // 바퀴 4개
+    const wheelPositions = [
+      { x: -0.15, z: 0.12 }, { x: 0.15, z: 0.12 },
+      { x: -0.15, z: -0.12 }, { x: 0.15, z: -0.12 }
+    ];
+    wheelPositions.forEach(p => {
+      const wheel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.05, 0.04, 12),
+        new THREE.MeshBasicMaterial({ color: 0x1a1f2e, transparent: true, opacity: 0.95 })
+      );
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(p.x, -0.09, p.z);
+      wheel.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(wheel.geometry),
+        new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 })
+      ));
+      g.add(wheel);
+    });
+
+    // 지붕 위 LiDAR 센서 (원통)
+    const lidar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 0.06, 12),
+      new THREE.MeshBasicMaterial({ color: 0x2a3550, transparent: true, opacity: 0.95 })
+    );
+    lidar.position.set(0, 0.12, 0);
+    g.add(lidar);
+
+    // LiDAR 스캔 링 (회전하는 얇은 링)
+    const scanRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.05, 0.003, 6, 24),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+    );
+    scanRing.rotation.x = Math.PI / 2;
+    scanRing.position.set(0, 0.12, 0);
+    g.add(scanRing);
+    g.userData.lidar = scanRing;
+
+    // 감지 영역 (부채꼴 스캔 라인 - 전방)
+    const scanMat = new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.5 });
+    const scanLines = [];
+    for (let i = 0; i < 7; i++) {
+      const a = -Math.PI / 4 + (i / 6) * (Math.PI / 2);
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0.22, 0, 0),
+          new THREE.Vector3(0.22 + Math.cos(a) * 0.22, 0, Math.sin(a) * 0.22)
+        ]),
+        scanMat.clone()
+      );
+      scanLines.push(line);
+      g.add(line);
+    }
+    g.userData.scanLines = scanLines;
+
+    // 스캔 호 (부채꼴 외곽)
+    const arcPts = [];
+    for (let i = 0; i <= 20; i++) {
+      const a = -Math.PI / 4 + (i / 20) * (Math.PI / 2);
+      arcPts.push(new THREE.Vector3(
+        0.22 + Math.cos(a) * 0.22,
+        0,
+        Math.sin(a) * 0.22
+      ));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(arcPts),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.4 })
+    ));
+
+    // 감지된 장애물 포인트들 (전방에 빨간 점)
+    const obstacles = [];
+    for (let i = 0; i < 4; i++) {
+      const obs = new THREE.Mesh(
+        new THREE.SphereGeometry(0.02, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff6b8b, transparent: true, opacity: 0.9 })
+      );
+      const a = -Math.PI / 4 + Math.random() * (Math.PI / 2);
+      const r = 0.1 + Math.random() * 0.15;
+      obs.position.set(0.22 + Math.cos(a) * r, 0, Math.sin(a) * r);
+      obs.userData.phase = Math.random() * Math.PI * 2;
+      g.add(obs);
+      obstacles.push(obs);
+    }
+    g.userData.obstacles = obstacles;
+
+    // 후방 브레이크등
+    const tail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.015, 0.03, 0.04),
+      new THREE.MeshBasicMaterial({ color: 0xff6b8b, transparent: true, opacity: 0.9 })
+    );
+    tail.position.set(-0.225, -0.03, 0);
+    g.add(tail);
+
+    return g;
+  }
+
+  // 19. 휴머노이드 — 인간형 로봇 (머리·몸통·팔·다리)
+  function buildHumanoid() {
+    const g = new THREE.Group();
+    const bodyMat = new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 });
+    const jointMat = new THREE.MeshBasicMaterial({ color: ACCENT });
+
+    // 머리 (둥근 박스 느낌)
+    const head = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.13, 0.11),
+      bodyMat.clone()
+    );
+    head.position.y = 0.3;
+    head.add(new THREE.LineSegments(new THREE.EdgesGeometry(head.geometry), WIRE_WHITE));
+    g.add(head);
+
+    // 눈 2개 (LED)
+    [-0.025, 0.025].forEach(x => {
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 8, 8),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.95 })
+      );
+      eye.position.set(x, 0.31, 0.056);
+      g.add(eye);
+    });
+
+    // 안테나 / 센서
+    const antenna = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.005, 0.005, 0.05, 6),
+      jointMat.clone()
+    );
+    antenna.position.set(0, 0.39, 0);
+    g.add(antenna);
+    const antTip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.015, 8, 8),
+      new THREE.MeshBasicMaterial({ color: WARM })
+    );
+    antTip.position.set(0, 0.42, 0);
+    g.add(antTip);
+
+    // 목 (얇은 실린더)
+    const neck = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, 0.05, 8),
+      jointMat.clone()
+    );
+    neck.position.y = 0.22;
+    g.add(neck);
+
+    // 몸통 (사다리꼴 느낌의 박스)
+    const torso = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.2, 0.12),
+      bodyMat.clone()
+    );
+    torso.position.y = 0.1;
+    torso.add(new THREE.LineSegments(new THREE.EdgesGeometry(torso.geometry), WIRE_WHITE));
+    g.add(torso);
+
+    // 가슴 코어 (에너지 소스 느낌)
+    const chest = new THREE.Mesh(
+      new THREE.SphereGeometry(0.03, 12, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    );
+    chest.position.set(0, 0.13, 0.061);
+    g.add(chest);
+    g.userData.chest = chest;
+
+    // 가슴 글로우 링
+    const chestRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.04, 0.003, 6, 20),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 })
+    );
+    chestRing.position.set(0, 0.13, 0.062);
+    g.add(chestRing);
+
+    // 어깨 관절 2개
+    const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 10), jointMat.clone());
+    shoulderL.position.set(-0.14, 0.18, 0);
+    g.add(shoulderL);
+    const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 10), jointMat.clone());
+    shoulderR.position.set(0.14, 0.18, 0);
+    g.add(shoulderR);
+
+    // 상완 (어깨 → 팔꿈치)
+    const upperArmL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.13, 0.05),
+      bodyMat.clone()
+    );
+    upperArmL.position.set(-0.14, 0.1, 0);
+    upperArmL.add(new THREE.LineSegments(new THREE.EdgesGeometry(upperArmL.geometry), WIRE_WHITE));
+    g.add(upperArmL);
+    g.userData.leftArm = upperArmL;
+
+    const upperArmR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.13, 0.05),
+      bodyMat.clone()
+    );
+    upperArmR.position.set(0.14, 0.1, 0);
+    upperArmR.add(new THREE.LineSegments(new THREE.EdgesGeometry(upperArmR.geometry), WIRE_WHITE));
+    g.add(upperArmR);
+    g.userData.rightArm = upperArmR;
+
+    // 팔꿈치 관절
+    const elbowL = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), jointMat.clone());
+    elbowL.position.set(-0.14, 0.03, 0);
+    g.add(elbowL);
+    const elbowR = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), jointMat.clone());
+    elbowR.position.set(0.14, 0.03, 0);
+    g.add(elbowR);
+
+    // 전완 (팔꿈치 → 손)
+    const foreArmL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.12, 0.04),
+      bodyMat.clone()
+    );
+    foreArmL.position.set(-0.14, -0.04, 0);
+    g.add(foreArmL);
+
+    const foreArmR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.12, 0.04),
+      bodyMat.clone()
+    );
+    foreArmR.position.set(0.14, -0.04, 0);
+    g.add(foreArmR);
+
+    // 손 (작은 박스)
+    const handL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.05, 0.04),
+      jointMat.clone()
+    );
+    handL.position.set(-0.14, -0.13, 0);
+    g.add(handL);
+    const handR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.05, 0.04),
+      jointMat.clone()
+    );
+    handR.position.set(0.14, -0.13, 0);
+    g.add(handR);
+
+    // 골반
+    const hip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.06, 0.1),
+      bodyMat.clone()
+    );
+    hip.position.y = -0.03;
+    hip.add(new THREE.LineSegments(new THREE.EdgesGeometry(hip.geometry), WIRE_WHITE));
+    g.add(hip);
+
+    // 고관절 2개
+    const hipL = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 10), jointMat.clone());
+    hipL.position.set(-0.06, -0.07, 0);
+    g.add(hipL);
+    const hipR = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 10), jointMat.clone());
+    hipR.position.set(0.06, -0.07, 0);
+    g.add(hipR);
+
+    // 허벅지
+    const thighL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.14, 0.06),
+      bodyMat.clone()
+    );
+    thighL.position.set(-0.06, -0.16, 0);
+    thighL.add(new THREE.LineSegments(new THREE.EdgesGeometry(thighL.geometry), WIRE_WHITE));
+    g.add(thighL);
+    g.userData.leftLeg = thighL;
+
+    const thighR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.14, 0.06),
+      bodyMat.clone()
+    );
+    thighR.position.set(0.06, -0.16, 0);
+    thighR.add(new THREE.LineSegments(new THREE.EdgesGeometry(thighR.geometry), WIRE_WHITE));
+    g.add(thighR);
+    g.userData.rightLeg = thighR;
+
+    // 무릎 관절
+    const kneeL = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), jointMat.clone());
+    kneeL.position.set(-0.06, -0.24, 0);
+    g.add(kneeL);
+    const kneeR = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), jointMat.clone());
+    kneeR.position.set(0.06, -0.24, 0);
+    g.add(kneeR);
+
+    // 정강이
+    const shinL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.13, 0.05),
+      bodyMat.clone()
+    );
+    shinL.position.set(-0.06, -0.31, 0);
+    g.add(shinL);
+    const shinR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.13, 0.05),
+      bodyMat.clone()
+    );
+    shinR.position.set(0.06, -0.31, 0);
+    g.add(shinR);
+
+    // 발
+    const footL = new THREE.Mesh(
+      new THREE.BoxGeometry(0.07, 0.03, 0.1),
+      jointMat.clone()
+    );
+    footL.position.set(-0.06, -0.39, 0.01);
+    g.add(footL);
+    const footR = new THREE.Mesh(
+      new THREE.BoxGeometry(0.07, 0.03, 0.1),
+      jointMat.clone()
+    );
+    footR.position.set(0.06, -0.39, 0.01);
+    g.add(footR);
+
+    // 전체 스케일 축소 (다른 노드와 비율 맞춤)
+    g.scale.setScalar(0.85);
+
+    return g;
+  }
+
+  // 20. 생성형 AI (Gen AI) — 중심 코어에서 텍스트/이미지/음악 결과물 생성
+  function buildGenAI() {
+    const g = new THREE.Group();
+
+    // 중앙 생성 코어 (이중 구체 + 발광)
+    const core = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.13, 1),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    g.add(core);
+
+    const coreWire = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.15, 1),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.5 })
+    );
+    g.add(coreWire);
+    g.userData.genaiCore = core;
+
+    // 3방향으로 뻗어나가는 생성 결과물
+    // 방향 1: 텍스트 (수평선들 - 글자 라인 느낌)
+    const textGroup = new THREE.Group();
+    for (let i = 0; i < 4; i++) {
+      const line = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15 - i * 0.02, 0.012, 0.005),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+      );
+      line.position.set(-0.33, 0.25 - i * 0.025, 0);
+      textGroup.add(line);
+    }
+    // 텍스트 프레임
+    const textFrame = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.22, 0.16),
+      new THREE.MeshBasicMaterial({ color: 0x0a1528, transparent: true, opacity: 0.3 })
+    );
+    textFrame.position.set(-0.33, 0.21, -0.005);
+    textGroup.add(textFrame);
+    textGroup.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.22, 0.16)),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 })
+    ).translateX(-0.33).translateY(0.21).translateZ(-0.004));
+    g.add(textGroup);
+
+    // 방향 2: 이미지 (작은 픽셀 그리드)
+    const imgGroup = new THREE.Group();
+    const imgFrame = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.18, 0.18),
+      new THREE.MeshBasicMaterial({ color: 0x0a1528, transparent: true, opacity: 0.3 })
+    );
+    imgFrame.position.set(0.33, 0.22, 0);
+    imgGroup.add(imgFrame);
+    imgGroup.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.18, 0.18)),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 })
+    ).translateX(0.33).translateY(0.22).translateZ(0.001));
+
+    // 픽셀 5x5
+    for (let x = 0; x < 5; x++) {
+      for (let y = 0; y < 5; y++) {
+        if (Math.random() > 0.4) {
+          const pixel = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.028, 0.028),
+            new THREE.MeshBasicMaterial({
+              color: [ACCENT, MAIN_BLUE, DEV_GREEN, WARM][Math.floor(Math.random() * 4)],
+              transparent: true,
+              opacity: 0.7 + Math.random() * 0.3
+            })
+          );
+          pixel.position.set(
+            0.33 - 0.07 + x * 0.032,
+            0.22 - 0.07 + y * 0.032,
+            0.002
+          );
+          imgGroup.add(pixel);
+        }
+      }
+    }
+    g.add(imgGroup);
+
+    // 방향 3: 음악 (아래쪽 - 음표 / 파형)
+    const musicGroup = new THREE.Group();
+    const musicWave = [];
+    for (let i = 0; i <= 30; i++) {
+      const x = -0.2 + (i / 30) * 0.4;
+      const y = -0.28 + Math.sin(i * 0.8) * 0.04;
+      musicWave.push(new THREE.Vector3(x, y, 0));
+    }
+    musicGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(musicWave),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+    ));
+    // 음표 동그라미 3개
+    for (let i = 0; i < 3; i++) {
+      const note = new THREE.Mesh(
+        new THREE.SphereGeometry(0.02, 10, 10),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+      );
+      note.position.set(-0.15 + i * 0.15, -0.3, 0.01);
+      musicGroup.add(note);
+      // 음표 꼬리
+      const stem = new THREE.Mesh(
+        new THREE.BoxGeometry(0.003, 0.06, 0.003),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+      );
+      stem.position.set(-0.13 + i * 0.15, -0.27, 0.01);
+      musicGroup.add(stem);
+    }
+    g.add(musicGroup);
+
+    // 코어 → 3방향 연결선 (에너지 스트림)
+    const streamMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.4 });
+    [
+      new THREE.Vector3(-0.33, 0.21, 0),
+      new THREE.Vector3(0.33, 0.22, 0),
+      new THREE.Vector3(0, -0.28, 0)
+    ].forEach(target => {
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), target]),
+        streamMat
+      ));
+    });
+
+    return g;
+  }
+
+  // 21. 에이전틱 AI (Agentic AI) — 중앙 에이전트 + 도구 체인 + 계획 노드
+  function buildAgenticAI() {
+    const g = new THREE.Group();
+
+    // 중앙 에이전트 (다이아몬드)
+    const agent = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.11, 0),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    g.add(agent);
+    agent.add(new THREE.LineSegments(new THREE.EdgesGeometry(agent.geometry), WIRE_WHITE));
+    g.userData.agent = agent;
+
+    // 계획(Plan) 노드 트리 - 상단 분기
+    const planRoot = new THREE.Vector3(0, 0.18, 0);
+    const planBranches = [
+      new THREE.Vector3(-0.18, 0.32, 0),
+      new THREE.Vector3(0, 0.35, 0),
+      new THREE.Vector3(0.18, 0.32, 0)
+    ];
+
+    const branchMat = new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.8 });
+    // 메인 라인 (에이전트 → 계획 루트)
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.11, 0), planRoot]),
+      branchMat
+    ));
+    // 계획 루트 → 각 브랜치
+    planBranches.forEach(b => {
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([planRoot, b]),
+        branchMat
+      ));
+      // 브랜치 끝 노드
+      const branch = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.05, 0.05),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+      );
+      branch.position.copy(b);
+      branch.add(new THREE.LineSegments(new THREE.EdgesGeometry(branch.geometry), WIRE_WHITE));
+      g.add(branch);
+    });
+    // 루트 노드
+    const root = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 10, 10),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    root.position.copy(planRoot);
+    g.add(root);
+
+    // 도구 체인 (하단 - 톱니바퀴들 연결)
+    const toolY = -0.25;
+    const tools = [
+      { x: -0.25, size: 0.05 },
+      { x: -0.1, size: 0.06 },
+      { x: 0.08, size: 0.055 },
+      { x: 0.25, size: 0.05 }
+    ];
+    tools.forEach((t, i) => {
+      const tool = new THREE.Mesh(
+        new THREE.CylinderGeometry(t.size, t.size, 0.02, 10),
+        new THREE.MeshBasicMaterial({ color: WARM, transparent: true, opacity: 0.9 })
+      );
+      tool.rotation.x = Math.PI / 2;
+      tool.position.set(t.x, toolY, 0);
+      g.add(tool);
+
+      // 톱니
+      for (let j = 0; j < 8; j++) {
+        const a = (j / 8) * Math.PI * 2;
+        const tooth = new THREE.Mesh(
+          new THREE.BoxGeometry(0.012, 0.012, 0.02),
+          new THREE.MeshBasicMaterial({ color: WARM })
+        );
+        tooth.position.set(
+          t.x + Math.cos(a) * (t.size + 0.008),
+          toolY + Math.sin(a) * (t.size + 0.008),
+          0
+        );
+        g.add(tooth);
+      }
+
+      tool.userData.spinDir = i % 2 === 0 ? 1 : -1;
+      if (!g.userData.tools) g.userData.tools = [];
+      g.userData.tools.push(tool);
+    });
+
+    // 에이전트 → 도구 연결선
+    const toolLinkMat = new THREE.LineBasicMaterial({ color: WARM, transparent: true, opacity: 0.4 });
+    tools.forEach(t => {
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, -0.11, 0),
+          new THREE.Vector3(t.x, toolY, 0)
+        ]),
+        toolLinkMat
+      ));
+    });
+
+    // 실행 사이클 링 (에이전트 주위 궤도)
+    const cycleRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.17, 0.004, 6, 40),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.5 })
+    );
+    cycleRing.rotation.x = Math.PI / 2.5;
+    g.add(cycleRing);
+    g.userData.cycleRing = cycleRing;
+
+    // 사이클을 따라 도는 펄스
+    const cyclePulse = new THREE.Mesh(
+      new THREE.SphereGeometry(0.018, 8, 8),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    g.add(cyclePulse);
+    g.userData.cyclePulse = cyclePulse;
+
+    return g;
+  }
+
+  // 22. 피지컬 AI (Physical AI) — 두뇌(AI 코어) + 로봇 몸체 + 환경 감지
+  function buildPhysicalAI() {
+    const g = new THREE.Group();
+
+    // 상단: AI 뇌 (반구 + 내부 뉴런 노드들)
+    const brain = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+    );
+    brain.position.y = 0.22;
+    g.add(brain);
+
+    // 뇌 와이어프레임
+    const brainWire = new THREE.Mesh(
+      new THREE.SphereGeometry(0.122, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.5 })
+    );
+    brainWire.position.y = 0.22;
+    g.add(brainWire);
+
+    // 뉴런 노드 (뇌 내부)
+    const neurons = [];
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * 0.08;
+      const h = Math.random() * 0.08;
+      const neuron = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 6, 6),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+      );
+      neuron.position.set(Math.cos(a) * r, 0.22 + h, Math.sin(a) * r);
+      neuron.userData.phase = Math.random() * Math.PI * 2;
+      g.add(neuron);
+      neurons.push(neuron);
+    }
+    g.userData.neurons = neurons;
+
+    // 뇌 → 몸 연결 (척추 느낌)
+    const spine = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.02, 0.14, 8),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+    );
+    spine.position.y = 0.1;
+    g.add(spine);
+
+    // 중간: 로봇 몸체 (박스)
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.12, 0.14),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+    );
+    body.position.y = -0.02;
+    body.add(new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry), WIRE_WHITE));
+    g.add(body);
+
+    // 몸체 중앙 코어 (맥동)
+    const bodyCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 12, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT })
+    );
+    bodyCore.position.set(0, -0.02, 0.071);
+    g.add(bodyCore);
+    g.userData.bodyCore = bodyCore;
+
+    // 양쪽 팔 (짧게)
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.14, 0.04),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+      );
+      arm.position.set(side * 0.14, -0.05, 0);
+      arm.add(new THREE.LineSegments(new THREE.EdgesGeometry(arm.geometry), WIRE_WHITE));
+      g.add(arm);
+
+      // 손
+      const hand = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 10, 10),
+        new THREE.MeshBasicMaterial({ color: ACCENT })
+      );
+      hand.position.set(side * 0.14, -0.14, 0);
+      g.add(hand);
+    });
+
+    // 하단: 이동 베이스 (바퀴 달린 원형)
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.16, 0.05, 16),
+      new THREE.MeshBasicMaterial({ color: 0x2a3550, transparent: true, opacity: 0.95 })
+    );
+    base.position.y = -0.15;
+    g.add(base);
+
+    // 바퀴 3개
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      const wheel = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0x1a1f2e })
+      );
+      wheel.position.set(Math.cos(a) * 0.12, -0.18, Math.sin(a) * 0.12);
+      g.add(wheel);
+    }
+
+    // 감지 웨이브 (바닥 주변 원형 감지 영역)
+    const sensorWave = new THREE.Mesh(
+      new THREE.TorusGeometry(0.25, 0.003, 6, 48),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.6 })
+    );
+    sensorWave.rotation.x = Math.PI / 2;
+    sensorWave.position.y = -0.2;
+    g.add(sensorWave);
+    g.userData.sensorWave = sensorWave;
+
+    // 두 번째 센서 링
+    const sensorWave2 = new THREE.Mesh(
+      new THREE.TorusGeometry(0.32, 0.003, 6, 48),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.3 })
+    );
+    sensorWave2.rotation.x = Math.PI / 2;
+    sensorWave2.position.y = -0.2;
+    g.add(sensorWave2);
+    g.userData.sensorWave2 = sensorWave2;
+
+    return g;
+  }
+
+  // 23. 멀티모달 AI — 중앙 퓨전 허브 + 4개 모달리티 입력
+  function buildMultimodal() {
+    const g = new THREE.Group();
+
+    // 중앙 퓨전 코어 (여러 면체)
+    const fusion = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.1, 0),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    g.add(fusion);
+    fusion.add(new THREE.LineSegments(new THREE.EdgesGeometry(fusion.geometry), WIRE_WHITE));
+    g.userData.fusion = fusion;
+
+    // 4개 모달리티 (텍스트, 이미지, 음성, 영상)
+    const modalities = [
+      { pos: new THREE.Vector3(-0.3, 0.2, 0), color: MAIN_BLUE, type: 'text' },
+      { pos: new THREE.Vector3(0.3, 0.2, 0), color: DEV_GREEN, type: 'image' },
+      { pos: new THREE.Vector3(-0.3, -0.2, 0), color: WARM, type: 'audio' },
+      { pos: new THREE.Vector3(0.3, -0.2, 0), color: 0xff6b8b, type: 'video' }
+    ];
+
+    const modNodes = [];
+    modalities.forEach(m => {
+      // 모달리티 아이콘 컨테이너
+      const container = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.14, 0.04),
+        new THREE.MeshBasicMaterial({ color: 0x0a1528, transparent: true, opacity: 0.6 })
+      );
+      container.position.copy(m.pos);
+      container.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(container.geometry),
+        new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.9 })
+      ));
+      g.add(container);
+
+      // 각 타입별 심볼
+      if (m.type === 'text') {
+        // 텍스트 라인 3개
+        for (let i = 0; i < 3; i++) {
+          const line = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08 - i * 0.015, 0.008, 0.005),
+            new THREE.MeshBasicMaterial({ color: m.color })
+          );
+          line.position.set(m.pos.x, m.pos.y + 0.02 - i * 0.02, 0.025);
+          g.add(line);
+        }
+      } else if (m.type === 'image') {
+        // 이미지 - 산 + 태양
+        const sun = new THREE.Mesh(
+          new THREE.CircleGeometry(0.015, 16),
+          new THREE.MeshBasicMaterial({ color: m.color })
+        );
+        sun.position.set(m.pos.x - 0.03, m.pos.y + 0.02, 0.025);
+        g.add(sun);
+        // 산 (삼각형)
+        const mountGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(m.pos.x - 0.05, m.pos.y - 0.03, 0.025),
+          new THREE.Vector3(m.pos.x, m.pos.y + 0.025, 0.025),
+          new THREE.Vector3(m.pos.x + 0.05, m.pos.y - 0.03, 0.025),
+          new THREE.Vector3(m.pos.x - 0.05, m.pos.y - 0.03, 0.025)
+        ]);
+        g.add(new THREE.Line(mountGeo, new THREE.LineBasicMaterial({ color: m.color })));
+      } else if (m.type === 'audio') {
+        // 오디오 - 파형
+        const wavePts = [];
+        for (let i = 0; i <= 20; i++) {
+          const x = m.pos.x - 0.05 + (i / 20) * 0.1;
+          const y = m.pos.y + Math.sin(i * 1.2) * 0.025;
+          wavePts.push(new THREE.Vector3(x, y, 0.025));
+        }
+        g.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(wavePts),
+          new THREE.LineBasicMaterial({ color: m.color })
+        ));
+      } else if (m.type === 'video') {
+        // 비디오 - 재생 삼각형
+        const playGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(m.pos.x - 0.02, m.pos.y + 0.025, 0.025),
+          new THREE.Vector3(m.pos.x + 0.025, m.pos.y, 0.025),
+          new THREE.Vector3(m.pos.x - 0.02, m.pos.y - 0.025, 0.025),
+          new THREE.Vector3(m.pos.x - 0.02, m.pos.y + 0.025, 0.025)
+        ]);
+        g.add(new THREE.Line(playGeo, new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.95 })));
+        // 프레임 테두리 점들
+        for (let i = 0; i < 4; i++) {
+          const tick = new THREE.Mesh(
+            new THREE.BoxGeometry(0.008, 0.008, 0.005),
+            new THREE.MeshBasicMaterial({ color: m.color })
+          );
+          tick.position.set(m.pos.x - 0.06 + i * 0.04, m.pos.y - 0.055, 0.025);
+          g.add(tick);
+        }
+      }
+
+      // 퓨전 코어 → 모달리티 연결선 + 흐르는 펄스
+      const linkMat = new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.5 });
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), m.pos]),
+        linkMat
+      ));
+
+      // 흐르는 데이터 펄스
+      const pulse = new THREE.Mesh(
+        new THREE.SphereGeometry(0.018, 8, 8),
+        new THREE.MeshBasicMaterial({ color: m.color, transparent: true, opacity: 0.95 })
+      );
+      pulse.userData = {
+        from: m.pos.clone(),
+        to: new THREE.Vector3(0, 0, 0),
+        t: Math.random()
+      };
+      g.add(pulse);
+      modNodes.push(pulse);
+    });
+    g.userData.modalPulses = modNodes;
+
+    return g;
+  }
+
+  // 24. 예측형 AI (Predictive AI) — 과거 데이터 → 예측 곡선 + 신뢰구간
+  function buildPredictiveAI() {
+    const g = new THREE.Group();
+
+    // 좌표 평면
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.75, 0.5),
+      new THREE.MeshBasicMaterial({ color: 0x0a1528, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+    );
+    g.add(plane);
+
+    // 프레임
+    g.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.75, 0.5)),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 })
+    ));
+
+    // 격자
+    const gridMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.15 });
+    for (let i = -2; i <= 2; i++) {
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-0.375, i * 0.1, 0.001),
+          new THREE.Vector3(0.375, i * 0.1, 0.001)
+        ]), gridMat));
+    }
+
+    // 수직 분기선 (과거 | 미래 경계)
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, -0.25, 0.002),
+        new THREE.Vector3(0, 0.25, 0.002)
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+    ));
+
+    // 과거 데이터 (실선, 좌측)
+    const pastPts = [];
+    const pastData = [-0.05, 0.02, -0.03, 0.08, 0.04, 0.12, 0.09, 0.15];
+    for (let i = 0; i < pastData.length; i++) {
+      const x = -0.37 + (i / (pastData.length - 1)) * 0.37;
+      pastPts.push(new THREE.Vector3(x, pastData[i], 0.003));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pastPts),
+      new THREE.LineBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.95 })
+    ));
+
+    // 과거 데이터 포인트
+    pastPts.forEach(pt => {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.015, 8, 8),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE })
+      );
+      dot.position.copy(pt);
+      g.add(dot);
+    });
+
+    // 예측 데이터 (점선 느낌의 선, 우측) - 더 낙관적 상승
+    const futurePts = [];
+    for (let i = 0; i <= 20; i++) {
+      const x = (i / 20) * 0.37;
+      // 선형 상승 + 약간의 진동
+      const y = 0.15 + (i / 20) * 0.1 + Math.sin(i * 0.5) * 0.01;
+      futurePts.push(new THREE.Vector3(x, y, 0.003));
+    }
+    // 예측 라인을 조각내서 점선 효과
+    for (let i = 0; i < futurePts.length - 1; i += 2) {
+      if (i + 1 < futurePts.length) {
+        g.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([futurePts[i], futurePts[i + 1]]),
+          new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.95 })
+        ));
+      }
+    }
+
+    // 예측 신뢰구간 (상하 영역 - 와이어)
+    const upperBound = [];
+    const lowerBound = [];
+    for (let i = 0; i <= 20; i++) {
+      const x = (i / 20) * 0.37;
+      const y = 0.15 + (i / 20) * 0.1;
+      const spread = 0.03 + (i / 20) * 0.05;
+      upperBound.push(new THREE.Vector3(x, y + spread, 0.002));
+      lowerBound.push(new THREE.Vector3(x, y - spread, 0.002));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(upperBound),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.4 })
+    ));
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(lowerBound),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.4 })
+    ));
+
+    // 예측 타겟 마커 (끝점 - 큰 동그라미)
+    const target = new THREE.Mesh(
+      new THREE.RingGeometry(0.025, 0.035, 16),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+    );
+    target.position.copy(futurePts[futurePts.length - 1]);
+    g.add(target);
+    g.userData.target = target;
+
+    const targetDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.012, 10, 10),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    targetDot.position.copy(futurePts[futurePts.length - 1]);
+    g.add(targetDot);
+
+    // 상단 PAST / FUTURE 마커 (라인)
+    // 왼쪽 PAST 표시 (작은 삼각형)
+    const pastMark = new THREE.Mesh(
+      new THREE.BoxGeometry(0.005, 0.025, 0.003),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.8 })
+    );
+    pastMark.position.set(-0.2, 0.29, 0);
+    g.add(pastMark);
+
+    // 오른쪽 FUTURE 표시 (상승 화살표)
+    const arrowMat = new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.8 });
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0.15, 0.28, 0),
+        new THREE.Vector3(0.25, 0.32, 0),
+        new THREE.Vector3(0.22, 0.3, 0),
+        new THREE.Vector3(0.25, 0.32, 0),
+        new THREE.Vector3(0.23, 0.28, 0)
+      ]),
+      arrowMat
+    ));
+
+    return g;
+  }
+
+  // ===== IT 분야 확장 =====
+
+  // 25. 블록체인 — 체인으로 연결된 블록들
+  function buildBlockchain() {
+    const g = new THREE.Group();
+    const positions = [
+      new THREE.Vector3(-0.3, 0.15, 0),
+      new THREE.Vector3(-0.1, 0.05, 0),
+      new THREE.Vector3(0.1, -0.05, 0),
+      new THREE.Vector3(0.3, -0.15, 0)
+    ];
+    const blocks = [];
+    positions.forEach((p, i) => {
+      const block = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.15, 0.15),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+      );
+      block.position.copy(p);
+      block.add(new THREE.LineSegments(new THREE.EdgesGeometry(block.geometry), WIRE_WHITE));
+
+      // 해시 심볼 (블록 면에 작은 큐브들)
+      for (let j = 0; j < 3; j++) {
+        const hash = new THREE.Mesh(
+          new THREE.BoxGeometry(0.015, 0.015, 0.005),
+          new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+        );
+        hash.position.set(-0.04 + j * 0.04, 0.04, 0.076);
+        block.add(hash);
+      }
+      g.add(block);
+      blocks.push(block);
+
+      // 체인 연결 (링크)
+      if (i > 0) {
+        const link = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.008, 0.12, 6),
+          new THREE.MeshBasicMaterial({ color: ACCENT })
+        );
+        const mid = new THREE.Vector3().lerpVectors(positions[i-1], p, 0.5);
+        link.position.copy(mid);
+        link.lookAt(p);
+        link.rotateX(Math.PI / 2);
+        g.add(link);
+      }
+    });
+    g.userData.blocks = blocks;
+    return g;
+  }
+
+  // 26. 클라우드 — 구름 형태 + 서버 연결
+  function buildCloud() {
+    const g = new THREE.Group();
+    // 구름 (여러 구체 겹침)
+    const cloudParts = [
+      { x: 0, y: 0.1, r: 0.15 },
+      { x: -0.15, y: 0.05, r: 0.12 },
+      { x: 0.15, y: 0.05, r: 0.12 },
+      { x: -0.07, y: 0.15, r: 0.1 },
+      { x: 0.08, y: 0.15, r: 0.1 }
+    ];
+    cloudParts.forEach(p => {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(p.r, 12, 10),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.7 })
+      );
+      sphere.position.set(p.x, p.y, 0);
+      g.add(sphere);
+
+      // 와이어
+      const wire = new THREE.Mesh(
+        new THREE.SphereGeometry(p.r + 0.005, 10, 8),
+        new THREE.MeshBasicMaterial({ color: ACCENT, wireframe: true, transparent: true, opacity: 0.4 })
+      );
+      wire.position.set(p.x, p.y, 0);
+      g.add(wire);
+    });
+
+    // 하단에서 업로드/다운로드 화살표
+    const upMat = new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 });
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.12, -0.2, 0),
+      new THREE.Vector3(-0.12, -0.05, 0),
+      new THREE.Vector3(-0.15, -0.08, 0),
+      new THREE.Vector3(-0.12, -0.05, 0),
+      new THREE.Vector3(-0.09, -0.08, 0)
+    ]), upMat));
+
+    const downMat = new THREE.LineBasicMaterial({ color: WARM, transparent: true, opacity: 0.9 });
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0.12, -0.05, 0),
+      new THREE.Vector3(0.12, -0.2, 0),
+      new THREE.Vector3(0.09, -0.17, 0),
+      new THREE.Vector3(0.12, -0.2, 0),
+      new THREE.Vector3(0.15, -0.17, 0)
+    ]), downMat));
+
+    // 클라이언트 디바이스 3개 (하단)
+    for (let i = 0; i < 3; i++) {
+      const device = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.035, 0.02),
+        new THREE.MeshBasicMaterial({ color: ACCENT })
+      );
+      device.position.set(-0.2 + i * 0.2, -0.28, 0);
+      g.add(device);
+    }
+    return g;
+  }
+
+  // 27. 사이버보안 — 방패 + 자물쇠
+  function buildSecurity() {
+    const g = new THREE.Group();
+    // 방패 (오각형)
+    const shieldPts = [
+      new THREE.Vector3(0, 0.25, 0),
+      new THREE.Vector3(0.2, 0.15, 0),
+      new THREE.Vector3(0.2, -0.05, 0),
+      new THREE.Vector3(0, -0.25, 0),
+      new THREE.Vector3(-0.2, -0.05, 0),
+      new THREE.Vector3(-0.2, 0.15, 0),
+      new THREE.Vector3(0, 0.25, 0)
+    ];
+    // 방패 면 (삼각형 분할)
+    const shieldGeo = new THREE.BufferGeometry();
+    const verts = [];
+    for (let i = 0; i < shieldPts.length - 1; i++) {
+      verts.push(0, 0, 0);
+      verts.push(shieldPts[i].x, shieldPts[i].y, 0);
+      verts.push(shieldPts[i+1].x, shieldPts[i+1].y, 0);
+    }
+    shieldGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    g.add(new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({
+      color: MAIN_BLUE, transparent: true, opacity: 0.6, side: THREE.DoubleSide
+    })));
+
+    // 방패 외곽선
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(shieldPts),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    ));
+
+    // 자물쇠 본체
+    const lock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.09, 0.04),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    );
+    lock.position.set(0, -0.02, 0.02);
+    lock.add(new THREE.LineSegments(new THREE.EdgesGeometry(lock.geometry), WIRE_WHITE));
+    g.add(lock);
+
+    // 자물쇠 고리 (반원)
+    const hookPts = [];
+    for (let i = 0; i <= 20; i++) {
+      const a = Math.PI * (i / 20);
+      hookPts.push(new THREE.Vector3(Math.cos(a) * 0.035, 0.025 + Math.sin(a) * 0.035, 0.02));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(hookPts),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })
+    ));
+
+    // 키홀
+    const keyhole = new THREE.Mesh(
+      new THREE.CircleGeometry(0.012, 12),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    keyhole.position.set(0, -0.015, 0.041);
+    g.add(keyhole);
+
+    return g;
+  }
+
+  // 28. DevOps — 무한대 루프 (CI/CD 사이클)
+  function buildDevOps() {
+    const g = new THREE.Group();
+    // 왼쪽 원 (Dev)
+    const leftRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.015, 8, 48),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    leftRing.position.x = -0.13;
+    g.add(leftRing);
+
+    // 오른쪽 원 (Ops)
+    const rightRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.015, 8, 48),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+    );
+    rightRing.position.x = 0.13;
+    g.add(rightRing);
+
+    // CI/CD 스테이지 마커들 (무한대 궤도 따라)
+    const stages = ['code', 'build', 'test', 'deploy', 'monitor', 'feedback'];
+    const stageMeshes = [];
+    stages.forEach((s, i) => {
+      const a = (i / stages.length) * Math.PI * 2;
+      const side = Math.cos(a) < 0 ? -1 : 1;
+      const stage = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, 0.035, 0.035),
+        new THREE.MeshBasicMaterial({ color: WARM, transparent: true, opacity: 0.95 })
+      );
+      stage.userData.baseAngle = a;
+      stageMeshes.push(stage);
+      g.add(stage);
+    });
+    g.userData.stages = stageMeshes;
+
+    // 중앙 교차점 (다이아몬드)
+    const center = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.04, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    g.add(center);
+    return g;
+  }
+
+  // 29. IoT — 중앙 허브 + 여러 센서 디바이스
+  function buildIoT() {
+    const g = new THREE.Group();
+    // 중앙 게이트웨이
+    const gw = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.06, 0.08),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    );
+    gw.add(new THREE.LineSegments(new THREE.EdgesGeometry(gw.geometry), WIRE_WHITE));
+    g.add(gw);
+
+    // Wi-Fi 웨이브 (위로 3단계)
+    for (let i = 1; i <= 3; i++) {
+      const wavePts = [];
+      for (let j = 0; j <= 12; j++) {
+        const a = -Math.PI / 4 + (j / 12) * (Math.PI / 2);
+        wavePts.push(new THREE.Vector3(
+          Math.sin(a) * (i * 0.05),
+          0.06 + Math.cos(a) * (i * 0.05),
+          0
+        ));
+      }
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(wavePts),
+        new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.5 - i * 0.1 })
+      ));
+    }
+
+    // 주변 IoT 디바이스들 (6개, 다양한 형태)
+    const devicePositions = [
+      { x: -0.3, y: 0.15, z: 0, type: 'box' },
+      { x: 0.3, y: 0.15, z: 0, type: 'sphere' },
+      { x: -0.3, y: -0.15, z: 0, type: 'cyl' },
+      { x: 0.3, y: -0.15, z: 0, type: 'box' },
+      { x: -0.25, y: 0, z: 0.1, type: 'sphere' },
+      { x: 0.25, y: 0, z: -0.1, type: 'cyl' }
+    ];
+
+    devicePositions.forEach(d => {
+      let mesh;
+      if (d.type === 'box') {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.05, 0.05),
+          new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+        );
+      } else if (d.type === 'sphere') {
+        mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.03, 10, 10),
+          new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+        );
+      } else {
+        mesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.025, 0.05, 10),
+          new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.9 })
+        );
+      }
+      mesh.position.set(d.x, d.y, d.z);
+      g.add(mesh);
+
+      // 연결선
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(d.x, d.y, d.z)
+        ]),
+        new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.4 })
+      ));
+    });
+    return g;
+  }
+
+  // 30. 컴퓨터 비전 — 눈 + 바운딩 박스 + 인식 포인트
+  function buildComputerVision() {
+    const g = new THREE.Group();
+    // 외곽 눈 형태 (렌즈 큰 원)
+    const eye = new THREE.Mesh(
+      new THREE.TorusGeometry(0.18, 0.012, 8, 48),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    );
+    g.add(eye);
+
+    // 홍채
+    const iris = new THREE.Mesh(
+      new THREE.CircleGeometry(0.12, 32),
+      new THREE.MeshBasicMaterial({ color: 0x0a1528, transparent: true, opacity: 0.9 })
+    );
+    g.add(iris);
+
+    // 동공
+    const pupil = new THREE.Mesh(
+      new THREE.CircleGeometry(0.05, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })
+    );
+    pupil.position.z = 0.001;
+    g.add(pupil);
+
+    // 중심 코어
+    const coreDot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.02, 16),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    coreDot.position.z = 0.002;
+    g.add(coreDot);
+
+    // 주변 바운딩 박스들 (객체 검출)
+    const boxPositions = [
+      { x: -0.3, y: 0.22, w: 0.1, h: 0.08 },
+      { x: 0.28, y: -0.15, w: 0.12, h: 0.09 },
+      { x: -0.22, y: -0.25, w: 0.08, h: 0.06 }
+    ];
+    boxPositions.forEach(b => {
+      const boxGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(b.x - b.w/2, b.y - b.h/2, 0),
+        new THREE.Vector3(b.x + b.w/2, b.y - b.h/2, 0),
+        new THREE.Vector3(b.x + b.w/2, b.y + b.h/2, 0),
+        new THREE.Vector3(b.x - b.w/2, b.y + b.h/2, 0),
+        new THREE.Vector3(b.x - b.w/2, b.y - b.h/2, 0)
+      ]);
+      g.add(new THREE.Line(boxGeo, new THREE.LineBasicMaterial({
+        color: DEV_GREEN, transparent: true, opacity: 0.8
+      })));
+      // 코너 마커
+      const corner = new THREE.Mesh(
+        new THREE.BoxGeometry(0.012, 0.012, 0.005),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+      );
+      corner.position.set(b.x - b.w/2, b.y + b.h/2, 0);
+      g.add(corner);
+    });
+
+    // 특징점들 (작은 점들)
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.22 + Math.random() * 0.1;
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.008, 6, 6),
+        new THREE.MeshBasicMaterial({ color: WARM })
+      );
+      dot.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+      g.add(dot);
+    }
+    return g;
+  }
+
+  // 31. 자연어처리 (NLP) — 문장 그래프 + 토큰
+  function buildNLP() {
+    const g = new THREE.Group();
+    // 토큰 (단어 블록들 수평 배치)
+    const tokens = [
+      { x: -0.3, c: MAIN_BLUE, w: 0.08 },
+      { x: -0.18, c: ACCENT, w: 0.1 },
+      { x: -0.04, c: MAIN_BLUE, w: 0.09 },
+      { x: 0.1, c: WARM, w: 0.07 },
+      { x: 0.22, c: ACCENT, w: 0.1 },
+      { x: 0.35, c: MAIN_BLUE, w: 0.06 }
+    ];
+    const tokenMeshes = [];
+    tokens.forEach(t => {
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(t.w, 0.05, 0.03),
+        new THREE.MeshBasicMaterial({ color: t.c, transparent: true, opacity: 0.9 })
+      );
+      box.position.set(t.x, 0, 0);
+      box.add(new THREE.LineSegments(new THREE.EdgesGeometry(box.geometry), WIRE_WHITE));
+      g.add(box);
+      tokenMeshes.push(box);
+    });
+
+    // Attention 라인 (토큰 간 연결 - 위쪽 아치)
+    const attentionMat = new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.6 });
+    const attnPairs = [[0,2],[1,4],[2,5],[0,3]];
+    attnPairs.forEach(pair => {
+      const a = tokens[pair[0]];
+      const b = tokens[pair[1]];
+      const pts = [];
+      for (let i = 0; i <= 20; i++) {
+        const t = i / 20;
+        const x = a.x + (b.x - a.x) * t;
+        const y = Math.sin(t * Math.PI) * 0.15 + 0.03;
+        pts.push(new THREE.Vector3(x, y, 0));
+      }
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        attentionMat
+      ));
+    });
+
+    // 아래: 임베딩 벡터 점들 (각 토큰 밑)
+    tokens.forEach(t => {
+      for (let j = 0; j < 4; j++) {
+        const emb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.008, 6, 6),
+          new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.8 })
+        );
+        emb.position.set(t.x, -0.08 - j * 0.03, 0);
+        g.add(emb);
+      }
+    });
+    return g;
+  }
+
+  // 32. 양자 컴퓨팅 — 블로흐 구 + 얽힌 큐비트
+  function buildQuantum() {
+    const g = new THREE.Group();
+    // 블로흐 구 (큰 와이어프레임)
+    const bloch = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT, wireframe: true, transparent: true, opacity: 0.6 })
+    );
+    g.add(bloch);
+
+    // 내부 투명 구
+    g.add(new THREE.Mesh(
+      new THREE.SphereGeometry(0.19, 16, 12),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.15 })
+    ));
+
+    // 적도 링 (두꺼운)
+    const eq = new THREE.Mesh(
+      new THREE.TorusGeometry(0.2, 0.005, 8, 48),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    eq.rotation.x = Math.PI / 2;
+    g.add(eq);
+
+    // 극 축
+    g.add(new THREE.Mesh(
+      new THREE.CylinderGeometry(0.003, 0.003, 0.42, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })
+    ));
+
+    // 상태 벡터 (|0⟩에서 임의 방향으로)
+    const stateVec = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.004, 0.004, 0.2, 6),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    stateVec.position.set(0.05, 0.08, 0);
+    stateVec.rotation.z = -0.5;
+    g.add(stateVec);
+    g.userData.stateVec = stateVec;
+
+    // 상태 벡터 끝 구
+    const stateTip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.02, 10, 10),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    stateTip.position.set(0.13, 0.15, 0);
+    g.add(stateTip);
+    g.userData.stateTip = stateTip;
+
+    // |0⟩, |1⟩ 극점 마커
+    [0.2, -0.2].forEach(y => {
+      const pole = new THREE.Mesh(
+        new THREE.SphereGeometry(0.018, 10, 10),
+        new THREE.MeshBasicMaterial({ color: WARM })
+      );
+      pole.position.y = y;
+      g.add(pole);
+    });
+
+    // 얽힘 표현 (외부 작은 큐비트 + 연결 파형)
+    const entangled = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 12, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT, wireframe: true, transparent: true, opacity: 0.7 })
+    );
+    entangled.position.set(0.4, -0.15, 0);
+    g.add(entangled);
+    g.userData.entangled = entangled;
+
+    // 얽힘 파형 연결
+    const entPts = [];
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20;
+      const x = 0.2 + t * 0.15;
+      const y = 0 + (-0.15) * t + Math.sin(t * Math.PI * 3) * 0.02;
+      entPts.push(new THREE.Vector3(x, y, 0));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(entPts),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.7 })
+    ));
+    return g;
+  }
+
+  // 33. AR/VR — 헤드셋 + 홀로그램 큐브
+  function buildARVR() {
+    const g = new THREE.Group();
+    // 헤드셋 본체
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.16, 0.14),
+      new THREE.MeshBasicMaterial({ color: 0x1a2030, transparent: true, opacity: 0.95 })
+    );
+    body.position.y = -0.1;
+    body.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(body.geometry),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.8 })
+    ));
+    g.add(body);
+
+    // 렌즈 2개
+    [-0.07, 0.07].forEach(x => {
+      const lens = new THREE.Mesh(
+        new THREE.CircleGeometry(0.045, 20),
+        new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.8 })
+      );
+      lens.position.set(x, -0.1, 0.071);
+      g.add(lens);
+
+      const lensRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.045, 0.005, 6, 24),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
+      );
+      lensRim.position.set(x, -0.1, 0.072);
+      g.add(lensRim);
+    });
+
+    // 스트랩
+    const strap = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.008, 6, 20, Math.PI),
+      new THREE.MeshBasicMaterial({ color: 0x2a3550 })
+    );
+    strap.position.y = -0.1;
+    strap.rotation.y = Math.PI / 2;
+    g.add(strap);
+
+    // 위에 홀로그램 (떠있는 와이어 큐브들)
+    const holos = [];
+    [
+      { x: 0, y: 0.2, size: 0.08 },
+      { x: -0.2, y: 0.15, size: 0.05 },
+      { x: 0.22, y: 0.18, size: 0.06 }
+    ].forEach(h => {
+      const holo = new THREE.Mesh(
+        new THREE.BoxGeometry(h.size, h.size, h.size),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN, wireframe: true, transparent: true, opacity: 0.8 })
+      );
+      holo.position.set(h.x, h.y, 0);
+      holo.userData.baseY = h.y;
+      holo.userData.phase = Math.random() * Math.PI * 2;
+      g.add(holo);
+      holos.push(holo);
+    });
+    g.userData.holos = holos;
+    return g;
+  }
+
+  // 34. 빅데이터 — 데이터 파이프 + 흐르는 스트림
+  function buildBigData() {
+    const g = new THREE.Group();
+    // 중앙 수집 파이프 (수평 실린더)
+    const pipe = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 0.6, 16),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.6 })
+    );
+    pipe.rotation.z = Math.PI / 2;
+    g.add(pipe);
+
+    // 파이프 엣지
+    const pipeEdge = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.062, 0.062, 0.6, 16),
+      new THREE.MeshBasicMaterial({ color: ACCENT, wireframe: true, transparent: true, opacity: 0.7 })
+    );
+    pipeEdge.rotation.z = Math.PI / 2;
+    g.add(pipeEdge);
+
+    // 좌측 (소스): 여러 작은 데이터 소스
+    for (let i = 0; i < 4; i++) {
+      const src = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.04, 0.04),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+      );
+      src.position.set(-0.35, -0.15 + i * 0.1, 0);
+      g.add(src);
+      // 소스 → 파이프 입구 라인
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-0.33, -0.15 + i * 0.1, 0),
+          new THREE.Vector3(-0.3, 0, 0)
+        ]),
+        new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.5 })
+      ));
+    }
+
+    // 우측 (저장): 큰 DB 큐브
+    const bigDb = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.18, 0.12),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    bigDb.position.set(0.38, 0, 0);
+    bigDb.add(new THREE.LineSegments(new THREE.EdgesGeometry(bigDb.geometry), WIRE_WHITE));
+    g.add(bigDb);
+
+    // 파이프 안을 흐르는 데이터 (작은 큐브들)
+    const flowParticles = [];
+    for (let i = 0; i < 6; i++) {
+      const p = new THREE.Mesh(
+        new THREE.BoxGeometry(0.025, 0.025, 0.025),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.95 })
+      );
+      p.userData.t = i / 6;
+      g.add(p);
+      flowParticles.push(p);
+    }
+    g.userData.flowParticles = flowParticles;
+    return g;
+  }
+
+  // ===== 수학 분야 =====
+
+  // 35. 그래프 이론 — 노드와 엣지로 이루어진 그래프
+  function buildGraphTheory() {
+    const g = new THREE.Group();
+    const nodePositions = [
+      new THREE.Vector3(0, 0.25, 0),
+      new THREE.Vector3(-0.25, 0.1, 0),
+      new THREE.Vector3(0.25, 0.1, 0),
+      new THREE.Vector3(-0.3, -0.15, 0),
+      new THREE.Vector3(0.3, -0.15, 0),
+      new THREE.Vector3(0, -0.05, 0),
+      new THREE.Vector3(0, -0.3, 0)
+    ];
+    const nodeList = [];
+    nodePositions.forEach((p, i) => {
+      const n = new THREE.Mesh(
+        new THREE.SphereGeometry(0.03, 12, 12),
+        new THREE.MeshBasicMaterial({ color: i === 0 ? DEV_GREEN : MAIN_BLUE, transparent: true, opacity: 0.95 })
+      );
+      n.position.copy(p);
+      n.userData.phase = Math.random() * Math.PI * 2;
+      g.add(n);
+      nodeList.push(n);
+    });
+    g.userData.graphNodes = nodeList;
+
+    const edges = [[0,1],[0,2],[1,3],[2,4],[1,5],[2,5],[3,6],[4,6],[5,6]];
+    edges.forEach(e => {
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([nodePositions[e[0]], nodePositions[e[1]]]),
+        new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7 })
+      ));
+    });
+    return g;
+  }
+
+  // 36. 확률/통계 — 정규분포 곡선 + 히스토그램
+  function buildStatistics() {
+    const g = new THREE.Group();
+    const curvePts = [];
+    for (let i = 0; i <= 40; i++) {
+      const x = -0.35 + (i / 40) * 0.7;
+      const y = -0.15 + Math.exp(-x * x * 15) * 0.35;
+      curvePts.push(new THREE.Vector3(x, y, 0));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(curvePts),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    ));
+
+    for (let i = 0; i < 14; i++) {
+      const x = -0.32 + i * 0.047;
+      const h = Math.exp(-x * x * 15) * 0.3;
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, h, 0.02),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.5 })
+      );
+      bar.position.set(x, -0.15 + h / 2, 0);
+      g.add(bar);
+    }
+
+    [-0.13, -0.26, 0.13, 0.26].forEach(xPos => {
+      const isMain = Math.abs(xPos) < 0.2;
+      g.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(xPos, -0.15, 0.001),
+          new THREE.Vector3(xPos, -0.15 + Math.exp(-xPos * xPos * 15) * 0.35, 0.001)
+        ]),
+        new THREE.LineBasicMaterial({
+          color: isMain ? DEV_GREEN : WARM,
+          transparent: true, opacity: 0.8
+        })
+      ));
+    });
+
+    const mean = new THREE.Mesh(
+      new THREE.SphereGeometry(0.018, 10, 10),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    mean.position.set(0, 0.2, 0.001);
+    g.add(mean);
+
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.4, -0.15, 0), new THREE.Vector3(0.4, -0.15, 0)
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+    ));
+    return g;
+  }
+
+  // 37. 이산 수학 — 벤 다이어그램
+  function buildDiscreteMath() {
+    const g = new THREE.Group();
+    const circles = [
+      { x: -0.08, y: 0.08, c: ACCENT },
+      { x: 0.08, y: 0.08, c: DEV_GREEN },
+      { x: 0, y: -0.08, c: WARM }
+    ];
+    circles.forEach(c => {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.15, 0.006, 8, 48),
+        new THREE.MeshBasicMaterial({ color: c.c, transparent: true, opacity: 0.8 })
+      );
+      ring.position.set(c.x, c.y, 0);
+      g.add(ring);
+
+      const fill = new THREE.Mesh(
+        new THREE.CircleGeometry(0.15, 32),
+        new THREE.MeshBasicMaterial({ color: c.c, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+      );
+      fill.position.set(c.x, c.y, 0);
+      g.add(fill);
+    });
+
+    const elements = [
+      { x: -0.15, y: 0.1 }, { x: 0.15, y: 0.1 }, { x: 0, y: -0.15 },
+      { x: 0, y: 0.1 }, { x: -0.07, y: -0.02 }, { x: 0.07, y: -0.02 },
+      { x: 0, y: 0.02 }
+    ];
+    elements.forEach(e => {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      dot.position.set(e.x, e.y, 0.005);
+      g.add(dot);
+    });
+    return g;
+  }
+
+  // 38. 암호 수학 — 시저 휠
+  function buildCryptoMath() {
+    const g = new THREE.Group();
+    const outer = new THREE.Mesh(
+      new THREE.TorusGeometry(0.22, 0.008, 8, 64),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9 })
+    );
+    g.add(outer);
+
+    const innerTicks = new THREE.Group();
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2;
+      const tick = new THREE.Mesh(
+        new THREE.BoxGeometry(0.004, 0.012, 0.004),
+        new THREE.MeshBasicMaterial({ color: WARM })
+      );
+      tick.position.set(Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0);
+      tick.rotation.z = a + Math.PI / 2;
+      innerTicks.add(tick);
+
+      // 내부 링
+      if (i === 0) {
+        const inner = new THREE.Mesh(
+          new THREE.TorusGeometry(0.15, 0.006, 8, 48),
+          new THREE.MeshBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.9 })
+        );
+        innerTicks.add(inner);
+      }
+    }
+    g.add(innerTicks);
+    g.userData.innerTicks = innerTicks;
+
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2;
+      const tick = new THREE.Mesh(
+        new THREE.BoxGeometry(0.005, 0.015, 0.004),
+        new THREE.MeshBasicMaterial({ color: MAIN_BLUE })
+      );
+      tick.position.set(Math.cos(a) * 0.22, Math.sin(a) * 0.22, 0);
+      tick.rotation.z = a + Math.PI / 2;
+      g.add(tick);
+    }
+
+    const key = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.04, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })
+    );
+    g.add(key);
+    g.userData.keyCenter = key;
+    return g;
+  }
+
+  // 39. 최적화 — 포물면 + 경사하강 경로
+  function buildOptimization() {
+    const g = new THREE.Group();
+    const size = 0.4, res = 10;
+    const surfPts = [];
+    for (let i = 0; i < res; i++) {
+      for (let j = 0; j < res; j++) {
+        const x = -size/2 + (i / (res-1)) * size;
+        const z = -size/2 + (j / (res-1)) * size;
+        const y = (x * x + z * z) * 1.5 - 0.25;
+        surfPts.push(new THREE.Vector3(x, y, z));
+      }
+    }
+    const gridMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.4 });
+    for (let i = 0; i < res; i++) {
+      const rowPts = [], colPts = [];
+      for (let j = 0; j < res; j++) {
+        rowPts.push(surfPts[i * res + j]);
+        colPts.push(surfPts[j * res + i]);
+      }
+      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rowPts), gridMat));
+      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(colPts), gridMat));
+    }
+
+    const pathPts = [];
+    for (let i = 0; i <= 15; i++) {
+      const t = i / 15;
+      const x = -0.18 * (1 - t);
+      const z = 0.15 * (1 - t);
+      const y = (x * x + z * z) * 1.5 - 0.25 + 0.01;
+      pathPts.push(new THREE.Vector3(x, y, z));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pathPts),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.95 })
+    ));
+
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 12, 12),
+      new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+    );
+    g.add(ball);
+    g.userData.optBall = ball;
+    g.userData.optPath = pathPts;
+
+    const minMark = new THREE.Mesh(
+      new THREE.TorusGeometry(0.04, 0.004, 6, 20),
+      new THREE.MeshBasicMaterial({ color: 0xff6b8b })
+    );
+    minMark.rotation.x = Math.PI / 2;
+    minMark.position.set(0, -0.24, 0);
+    g.add(minMark);
+    return g;
+  }
+
+  // 40. 미분방정식 — 벡터 필드 + 해 곡선
+  function buildDiffEq() {
+    const g = new THREE.Group();
+    const arrowMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 });
+    for (let i = -2; i <= 2; i++) {
+      for (let j = -2; j <= 2; j++) {
+        const x = i * 0.1, y = j * 0.1;
+        const dx = -y * 0.4, dy = x * 0.4;
+        const end = new THREE.Vector3(x + dx * 0.15, y + dy * 0.15, 0);
+        g.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, y, 0), end]),
+          arrowMat
+        ));
+        const tip = new THREE.Mesh(
+          new THREE.SphereGeometry(0.006, 6, 6),
+          new THREE.MeshBasicMaterial({ color: ACCENT })
+        );
+        tip.position.copy(end);
+        g.add(tip);
+      }
+    }
+
+    const solPts = [];
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100 * Math.PI * 3;
+      const r = 0.02 + t * 0.03;
+      solPts.push(new THREE.Vector3(Math.cos(t) * r, Math.sin(t) * r, 0.01));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(solPts),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.95 })
+    ));
+
+    const initDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.015, 10, 10),
+      new THREE.MeshBasicMaterial({ color: WARM })
+    );
+    g.add(initDot);
+    return g;
+  }
+
+  // 41. 기하학 — 정십이면체 + 내외접 구
+  function buildGeometry() {
+    const g = new THREE.Group();
+    const dodeca = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.2, 0),
+      new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.6 })
+    );
+    dodeca.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(dodeca.geometry),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })
+    ));
+    g.add(dodeca);
+    g.userData.geoShape = dodeca;
+
+    const inscr = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 16, 12),
+      new THREE.MeshBasicMaterial({ color: ACCENT, wireframe: true, transparent: true, opacity: 0.4 })
+    );
+    g.add(inscr);
+
+    const outerPts = new THREE.BufferGeometry();
+    const outerPos = [];
+    for (let i = 0; i < 50; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 0.25;
+      outerPos.push(r * Math.sin(phi) * Math.cos(theta));
+      outerPos.push(r * Math.sin(phi) * Math.sin(theta));
+      outerPos.push(r * Math.cos(phi));
+    }
+    outerPts.setAttribute('position', new THREE.Float32BufferAttribute(outerPos, 3));
+    g.add(new THREE.Points(outerPts, new THREE.PointsMaterial({
+      color: DEV_GREEN, size: 0.015, transparent: true, opacity: 0.8
+    })));
+    return g;
+  }
+
+  // 42. 정수론 — 소수 나선 (Ulam-like)
+  function buildNumberTheory() {
+    const g = new THREE.Group();
+    const spiralPts = [];
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200 * Math.PI * 6;
+      const r = 0.02 + t * 0.012;
+      spiralPts.push(new THREE.Vector3(Math.cos(t) * r, Math.sin(t) * r, 0));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(spiralPts),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.6 })
+    ));
+
+    const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43];
+    primes.forEach(p => {
+      const t = (p / 50) * Math.PI * 6;
+      const r = 0.02 + t * 0.012;
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.015, 8, 8),
+        new THREE.MeshBasicMaterial({ color: DEV_GREEN })
+      );
+      dot.position.set(Math.cos(t) * r, Math.sin(t) * r, 0.005);
+      g.add(dot);
+    });
+
+    for (let n = 1; n <= 50; n++) {
+      if (!primes.includes(n) && n !== 1) {
+        const t = (n / 50) * Math.PI * 6;
+        const r = 0.02 + t * 0.012;
+        const dot = new THREE.Mesh(
+          new THREE.SphereGeometry(0.006, 6, 6),
+          new THREE.MeshBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.6 })
+        );
+        dot.position.set(Math.cos(t) * r, Math.sin(t) * r, 0.003);
+        g.add(dot);
+      }
+    }
+
+    const center = new THREE.Mesh(
+      new THREE.SphereGeometry(0.02, 10, 10),
+      new THREE.MeshBasicMaterial({ color: WARM })
+    );
+    g.add(center);
+    return g;
+  }
+
+  // 43. 푸리에 해석 — 사인파 합성
+  function buildFourier() {
+    const g = new THREE.Group();
+    const mats = [
+      new THREE.LineBasicMaterial({ color: MAIN_BLUE, transparent: true, opacity: 0.6 }),
+      new THREE.LineBasicMaterial({ color: WARM, transparent: true, opacity: 0.6 }),
+      new THREE.LineBasicMaterial({ color: DEV_GREEN, transparent: true, opacity: 0.6 })
+    ];
+    const freqs = [1, 3, 5];
+    const amps = [0.1, 0.05, 0.033];
+
+    freqs.forEach((f, idx) => {
+      const pts = [];
+      for (let i = 0; i <= 60; i++) {
+        const x = -0.35 + (i / 60) * 0.7;
+        const y = 0.18 - idx * 0.08 + Math.sin(x * f * Math.PI * 3) * amps[idx];
+        pts.push(new THREE.Vector3(x, y, 0));
+      }
+      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mats[idx]));
+    });
+
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.4, -0.08, 0), new THREE.Vector3(0.4, -0.08, 0)
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 })
+    ));
+
+    const sumPts = [];
+    for (let i = 0; i <= 100; i++) {
+      const x = -0.35 + (i / 100) * 0.7;
+      let y = -0.22;
+      freqs.forEach((f, idx) => {
+        y += Math.sin(x * f * Math.PI * 3) * amps[idx] * 1.5;
+      });
+      sumPts.push(new THREE.Vector3(x, y, 0));
+    }
+    g.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(sumPts),
+      new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    ));
+
+    for (let i = 0; i < 2; i++) {
+      const eq = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.005, 0.005),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      eq.position.set(-0.42, -0.18 + i * 0.012, 0);
+      g.add(eq);
+    }
+    return g;
+  }
+
+  // ============ 도메인 정의 ============
+  const DOMAINS = [
+    { name: 'DIGITAL TWIN',       build: buildDigitalTwin },
+    { name: 'SMART FACTORY',      build: buildSmartFactory },
+    { name: 'FINANCE',            build: buildFinance },
+    { name: 'LINEAR ALGEBRA',     build: buildLinearAlgebra },
+    { name: 'CALCULUS',           build: buildCalculus },
+    { name: 'LANGUAGES',          build: buildLanguages },
+    { name: 'WEB',                build: buildWeb },
+    { name: 'ANDROID',            build: buildAndroid },
+    { name: 'LINUX',              build: buildLinux },
+    { name: 'ROBOT SOFTWARE',     build: buildRobotSoftware },
+    { name: 'DATA ANALYTICS',     build: buildADP },
+    { name: 'DATA ARCHITECTURE',  build: buildDAP },
+    { name: 'DATABASE · SQL',     build: buildSQLP },
+    { name: 'NETWORK',            build: buildNetwork },
+    { name: 'GAME',               build: buildGame },
+    { name: 'SERVER',             build: buildServer },
+    { name: 'REAL-TIME SYSTEM',   build: buildRealtime },
+    { name: 'AUTONOMOUS DRIVING', build: buildAutonomous },
+    { name: 'HUMANOID',           build: buildHumanoid },
+    { name: 'GENERATIVE AI',      build: buildGenAI },
+    { name: 'AGENTIC AI',         build: buildAgenticAI },
+    { name: 'PHYSICAL AI',        build: buildPhysicalAI },
+    { name: 'MULTIMODAL AI',      build: buildMultimodal },
+    { name: 'PREDICTIVE AI',      build: buildPredictiveAI },
+    { name: 'BLOCKCHAIN',         build: buildBlockchain },
+    { name: 'CLOUD',              build: buildCloud },
+    { name: 'CYBERSECURITY',      build: buildSecurity },
+    { name: 'DEVOPS',             build: buildDevOps },
+    { name: 'IOT',                build: buildIoT },
+    { name: 'COMPUTER VISION',    build: buildComputerVision },
+    { name: 'NLP',                build: buildNLP },
+    { name: 'QUANTUM COMPUTING',  build: buildQuantum },
+    { name: 'AR / VR',            build: buildARVR },
+    { name: 'BIG DATA',           build: buildBigData },
+    { name: 'GRAPH THEORY',       build: buildGraphTheory },
+    { name: 'STATISTICS',         build: buildStatistics },
+    { name: 'DISCRETE MATH',      build: buildDiscreteMath },
+    { name: 'CRYPTOGRAPHY',       build: buildCryptoMath },
+    { name: 'OPTIMIZATION',       build: buildOptimization },
+    { name: 'DIFFERENTIAL EQ',    build: buildDiffEq },
+    { name: 'GEOMETRY',           build: buildGeometry },
+    { name: 'NUMBER THEORY',      build: buildNumberTheory },
+    { name: 'FOURIER ANALYSIS',   build: buildFourier }
+  ];
+
+  // ============ 노드 배치 (피보나치 구) ============
+  const nodes = [];
+  const nodeGroup = new THREE.Group();
+  scene.add(nodeGroup);
+
+  const N = DOMAINS.length;
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const orbitRadius = 9.0;
+
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (i / (N - 1)) * 2;
+    const radiusAtY = Math.sqrt(1 - y * y);
+    const theta = goldenAngle * i;
+    const x = Math.cos(theta) * radiusAtY;
+    const z = Math.sin(theta) * radiusAtY;
+    const pos = new THREE.Vector3(x, y, z).multiplyScalar(orbitRadius);
+
+    const icon = DOMAINS[i].build();
+    icon.position.copy(pos);
+
+    // 선택용 히트박스 (투명 구)
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 8, 8),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    icon.add(hit);
+
+    // 주변 작은 링 (도메인 표식)
+    const orbit = new THREE.Mesh(
+      new THREE.TorusGeometry(0.48, 0.003, 6, 48),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.35 })
+    );
+    orbit.rotation.x = Math.PI / 2;
+    icon.add(orbit);
+
+    icon.userData = {
+      basePos: pos.clone(),
+      phase: Math.random() * Math.PI * 2,
+      name: DOMAINS[i].name,
+      hit: hit,
+      orbit: orbit,
+      spin: icon.userData.spin || false,
+      blinker: icon.userData.blinker,
+      arm: icon.userData.arm,
+      armPivot: icon.userData.armPivot,
+      packets: icon.userData.packets,
+      leds: icon.userData.leds,
+      minuteHand: icon.userData.minuteHand,
+      hourHand: icon.userData.hourHand,
+      secondHand: icon.userData.secondHand,
+      lidar: icon.userData.lidar,
+      scanLines: icon.userData.scanLines,
+      obstacles: icon.userData.obstacles,
+      chest: icon.userData.chest,
+      leftArm: icon.userData.leftArm,
+      rightArm: icon.userData.rightArm,
+      leftLeg: icon.userData.leftLeg,
+      rightLeg: icon.userData.rightLeg,
+      genaiCore: icon.userData.genaiCore,
+      agent: icon.userData.agent,
+      tools: icon.userData.tools,
+      cycleRing: icon.userData.cycleRing,
+      cyclePulse: icon.userData.cyclePulse,
+      neurons: icon.userData.neurons,
+      bodyCore: icon.userData.bodyCore,
+      sensorWave: icon.userData.sensorWave,
+      sensorWave2: icon.userData.sensorWave2,
+      fusion: icon.userData.fusion,
+      modalPulses: icon.userData.modalPulses,
+      target: icon.userData.target,
+      blocks: icon.userData.blocks,
+      stages: icon.userData.stages,
+      holos: icon.userData.holos,
+      flowParticles: icon.userData.flowParticles,
+      stateVec: icon.userData.stateVec,
+      stateTip: icon.userData.stateTip,
+      entangled: icon.userData.entangled,
+      innerTicks: icon.userData.innerTicks,
+      keyCenter: icon.userData.keyCenter,
+      optBall: icon.userData.optBall,
+      optPath: icon.userData.optPath,
+      geoShape: icon.userData.geoShape,
+      graphNodes: icon.userData.graphNodes
+    };
+
+    nodes.push(icon);
+    nodeGroup.add(icon);
+  }
+
+  // ============ 허브 → 노드 연결선 ============
+  const connectionGroup = new THREE.Group();
+  scene.add(connectionGroup);
+
+  const connections = [];
+  nodes.forEach((node) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+      color: ACCENT, transparent: true, opacity: 0.2
+    }));
+    connectionGroup.add(line);
+    connections.push({ line, node });
+  });
+
+  // ============ 데이터 펄스 ============
+  const pulses = [];
+  for (let i = 0; i < 20; i++) {
+    const pulse = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 8, 8),
+      new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95 })
+    );
+    pulse.userData = {
+      target: Math.floor(Math.random() * nodes.length),
+      t: Math.random(),
+      speed: 0.004 + Math.random() * 0.006,
+      direction: Math.random() > 0.5 ? 1 : -1
+    };
+    scene.add(pulse);
+    pulses.push(pulse);
+  }
+
+  // ============ 노드 간 메쉬 ============
+  const meshGroup = new THREE.Group();
+  scene.add(meshGroup);
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      if (Math.random() > 0.8) {
+        const geo = new THREE.BufferGeometry().setFromPoints([
+          nodes[i].userData.basePos, nodes[j].userData.basePos
+        ]);
+        meshGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
+          color: 0x3a5580, transparent: true, opacity: 0.18
+        })));
+      }
+    }
+  }
+
+  // ============ 배경 입자 ============
+  const bgCount = 1500;
+  const bgGeo = new THREE.BufferGeometry();
+  const bgPos = new Float32Array(bgCount * 3);
+  const bgColor = new Float32Array(bgCount * 3);
+  for (let i = 0; i < bgCount; i++) {
+    const r = 20 + Math.random() * 35;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    bgPos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    bgPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    bgPos[i*3+2] = r * Math.cos(phi);
+    const c = 0.3 + Math.random() * 0.5;
+    bgColor[i*3]   = c * 0.4;
+    bgColor[i*3+1] = c * 0.7;
+    bgColor[i*3+2] = c * 1.0;
+  }
+  bgGeo.setAttribute('position', new THREE.BufferAttribute(bgPos, 3));
+  bgGeo.setAttribute('color', new THREE.BufferAttribute(bgColor, 3));
+  const bg = new THREE.Points(bgGeo, new THREE.PointsMaterial({
+    size: 0.05, vertexColors: true, transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending
+  }));
+  scene.add(bg);
+
+  // ============ 인터랙션 ============
+  let targetRotX = 0, targetRotY = 0;
+  let rotX = 0, rotY = 0;
+  let isDragging = false;
+  let dragPrev = { x: 0, y: 0 };
+  let manualRotX = 0, manualRotY = 0;
+
+  const raycaster = new THREE.Raycaster();
+  const mouseNDC = new THREE.Vector2();
+  let hoveredNode = null;
+
+  window.addEventListener('mousemove', (e) => {
+    const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+    const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+    targetRotY = nx * 0.4;
+    targetRotX = ny * 0.25;
+    mouseNDC.x = nx;
+    mouseNDC.y = -ny;
+
+    if (isDragging) {
+      manualRotY += (e.clientX - dragPrev.x) * 0.005;
+      manualRotX += (e.clientY - dragPrev.y) * 0.005;
+      dragPrev.x = e.clientX;
+      dragPrev.y = e.clientY;
+    }
+  });
+  window.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragPrev.x = e.clientX; dragPrev.y = e.clientY;
+    cursor.style.width = '44px';
+    cursor.style.height = '44px';
+  });
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    cursor.style.width = '28px';
+    cursor.style.height = '28px';
+  });
+  window.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 0) {
+      const nx = (e.touches[0].clientX / window.innerWidth - 0.5) * 2;
+      const ny = (e.touches[0].clientY / window.innerHeight - 0.5) * 2;
+      targetRotY = nx * 0.4;
+      targetRotX = ny * 0.25;
+    }
+  }, { passive: true });
+
+  // ============ 애니메이션 ============
+  const clock = new THREE.Clock();
+  const hubWorld = new THREE.Vector3(0, 0, 0);
+  const tmpVec = new THREE.Vector3();
+
+  function animate() {
+    const t = clock.getElapsedTime();
+
+    rotX += (targetRotX + manualRotX - rotX) * 0.05;
+    rotY += (targetRotY + manualRotY - rotY) * 0.05;
+
+    nodeGroup.rotation.x = rotX;
+    nodeGroup.rotation.y = rotY + t * 0.06;
+    connectionGroup.rotation.x = rotX;
+    connectionGroup.rotation.y = rotY + t * 0.06;
+    meshGroup.rotation.x = rotX;
+    meshGroup.rotation.y = rotY + t * 0.06;
+
+    hubGroup.rotation.x = rotX * 0.3;
+    hubGroup.rotation.y = rotY * 0.3 + t * 0.25;
+    core.scale.setScalar(1 + Math.sin(t * 2) * 0.08);
+    shell.rotation.x = -t * 0.15;
+    shell.rotation.z = t * 0.1;
+
+    hubRings.forEach(ring => {
+      ring.rotation.x += ring.userData.sx;
+      ring.rotation.y += ring.userData.sy;
+    });
+
+    nodes.forEach((node, idx) => {
+      const ph = node.userData.phase;
+      const breathe = 1 + Math.sin(t * 1.2 + ph) * 0.06;
+      node.scale.setScalar(breathe);
+
+      // 아이콘을 카메라 쪽으로 향하게 (빌보드 느낌은 X, 대신 자체 회전)
+      node.rotation.y += 0.004;
+
+      // spin 속성이 있는 것들은 더 빨리 돌기 (기어, 지구)
+      if (node.userData.spin) {
+        node.rotation.z += 0.01;
+      }
+
+      // 리눅스 커서 깜빡임
+      if (node.userData.blinker) {
+        node.userData.blinker.material.opacity = Math.floor(t * 2) % 2 === 0 ? 0.9 : 0.1;
+      }
+
+      // 로봇팔 움직임
+      if (node.userData.armPivot) {
+        node.userData.armPivot.rotation.z = Math.sin(t * 1.5 + ph) * 0.3;
+      }
+
+      // 네트워크 패킷 이동
+      if (node.userData.packets) {
+        node.userData.packets.forEach(packet => {
+          packet.userData.t += 0.012;
+          if (packet.userData.t > 1) packet.userData.t = 0;
+          packet.position.lerpVectors(packet.userData.from, packet.userData.to, packet.userData.t);
+        });
+      }
+
+      // 서버 LED 깜빡임 (랜덤 패턴)
+      if (node.userData.leds) {
+        node.userData.leds.forEach(led => {
+          const flash = Math.sin(t * 4 + led.userData.phase) * 0.5 + 0.5;
+          led.material.opacity = 0.3 + flash * 0.7;
+        });
+      }
+
+      // 실시간 시스템 시곗바늘 회전 (빠르게 돌아가는 클럭)
+      if (node.userData.secondHand) {
+        node.userData.secondHand.rotation.z = -t * 3.0;
+      }
+      if (node.userData.minuteHand) {
+        node.userData.minuteHand.rotation.z = -t * 0.8;
+      }
+      if (node.userData.hourHand) {
+        node.userData.hourHand.rotation.z = -t * 0.15;
+      }
+
+      // 자율주행 LiDAR 회전
+      if (node.userData.lidar) {
+        node.userData.lidar.rotation.y = t * 4.0;
+      }
+      // 자율주행 스캔 라인 순차 밝기
+      if (node.userData.scanLines) {
+        node.userData.scanLines.forEach((line, idx) => {
+          const wave = Math.sin(t * 3 - idx * 0.5) * 0.5 + 0.5;
+          line.material.opacity = 0.2 + wave * 0.6;
+        });
+      }
+      // 자율주행 장애물 펄싱
+      if (node.userData.obstacles) {
+        node.userData.obstacles.forEach(obs => {
+          const pulse = Math.sin(t * 3 + obs.userData.phase) * 0.5 + 0.5;
+          obs.scale.setScalar(0.8 + pulse * 0.6);
+          obs.material.opacity = 0.5 + pulse * 0.5;
+        });
+      }
+
+      // 휴머노이드 가슴 코어 발광
+      if (node.userData.chest) {
+        const glow = Math.sin(t * 2 + ph) * 0.5 + 0.5;
+        node.userData.chest.scale.setScalar(0.85 + glow * 0.3);
+      }
+      // 휴머노이드 워킹 모션 (팔/다리 교차 스윙)
+      if (node.userData.leftArm && node.userData.rightArm) {
+        const swing = Math.sin(t * 2 + ph) * 0.25;
+        node.userData.leftArm.rotation.x = swing;
+        node.userData.rightArm.rotation.x = -swing;
+      }
+      if (node.userData.leftLeg && node.userData.rightLeg) {
+        const swing = Math.sin(t * 2 + ph) * 0.15;
+        node.userData.leftLeg.rotation.x = -swing;
+        node.userData.rightLeg.rotation.x = swing;
+      }
+
+      // 생성형 AI 코어 맥동
+      if (node.userData.genaiCore) {
+        node.userData.genaiCore.scale.setScalar(1 + Math.sin(t * 3 + ph) * 0.15);
+        node.userData.genaiCore.rotation.y = t * 0.8;
+      }
+
+      // 에이전틱 AI - 에이전트 회전 + 도구 회전 + 사이클 펄스
+      if (node.userData.agent) {
+        node.userData.agent.rotation.y = t * 0.5;
+        node.userData.agent.rotation.x = t * 0.3;
+      }
+      if (node.userData.tools) {
+        node.userData.tools.forEach(tool => {
+          tool.rotation.z += 0.02 * tool.userData.spinDir;
+        });
+      }
+      if (node.userData.cycleRing) {
+        node.userData.cycleRing.rotation.z = t * 0.5;
+      }
+      if (node.userData.cyclePulse) {
+        const a = t * 1.5;
+        const r = 0.17;
+        // 기울어진 궤도를 따라
+        node.userData.cyclePulse.position.set(
+          Math.cos(a) * r,
+          Math.sin(a) * r * 0.4,
+          Math.sin(a) * r * 0.8
+        );
+      }
+
+      // 피지컬 AI - 뉴런 점멸 + 몸체 코어 + 센서 웨이브
+      if (node.userData.neurons) {
+        node.userData.neurons.forEach(n => {
+          const pulse = Math.sin(t * 4 + n.userData.phase) * 0.5 + 0.5;
+          n.material.opacity = 0.3 + pulse * 0.7;
+          n.scale.setScalar(0.7 + pulse * 0.6);
+        });
+      }
+      if (node.userData.bodyCore) {
+        node.userData.bodyCore.scale.setScalar(1 + Math.sin(t * 2.5) * 0.2);
+      }
+      if (node.userData.sensorWave && node.userData.sensorWave2) {
+        // 센서 링이 확장하는 느낌
+        const s1 = 0.9 + Math.sin(t * 2) * 0.15;
+        const s2 = 0.9 + Math.sin(t * 2 - 1) * 0.15;
+        node.userData.sensorWave.scale.set(s1, s1, 1);
+        node.userData.sensorWave2.scale.set(s2, s2, 1);
+        node.userData.sensorWave.material.opacity = 0.3 + Math.sin(t * 2) * 0.3;
+        node.userData.sensorWave2.material.opacity = 0.2 + Math.sin(t * 2 - 1) * 0.2;
+      }
+
+      // 멀티모달 - 퓨전 코어 회전 + 모달리티 펄스 흐름
+      if (node.userData.fusion) {
+        node.userData.fusion.rotation.x = t * 0.4;
+        node.userData.fusion.rotation.y = t * 0.6;
+      }
+      if (node.userData.modalPulses) {
+        node.userData.modalPulses.forEach(pulse => {
+          pulse.userData.t += 0.012;
+          if (pulse.userData.t > 1) pulse.userData.t = 0;
+          pulse.position.lerpVectors(pulse.userData.from, pulse.userData.to, pulse.userData.t);
+        });
+      }
+
+      // 예측형 AI - 타겟 링 회전 + 펄스
+      if (node.userData.target) {
+        node.userData.target.rotation.z = t * 0.8;
+        node.userData.target.scale.setScalar(1 + Math.sin(t * 3) * 0.15);
+      }
+
+      // 블록체인 - 블록 호흡
+      if (node.userData.blocks) {
+        node.userData.blocks.forEach((b, idx) => {
+          b.scale.setScalar(1 + Math.sin(t * 2 + idx * 0.5) * 0.05);
+        });
+      }
+
+      // DevOps - 무한대 경로를 도는 스테이지 마커
+      if (node.userData.stages) {
+        node.userData.stages.forEach((s, idx) => {
+          const a = s.userData.baseAngle + t * 0.6;
+          // 무한대 (lemniscate) 파라메트릭
+          const sc = Math.sqrt(2) * Math.cos(a) / (Math.sin(a) * Math.sin(a) + 1);
+          const x = sc * 0.15;
+          const y = sc * Math.sin(a) * 0.1;
+          s.position.set(x, y, 0);
+        });
+      }
+
+      // AR/VR - 홀로그램 떠있기
+      if (node.userData.holos) {
+        node.userData.holos.forEach(h => {
+          h.position.y = h.userData.baseY + Math.sin(t * 2 + h.userData.phase) * 0.02;
+          h.rotation.y = t * 0.5 + h.userData.phase;
+          h.rotation.x = t * 0.3;
+        });
+      }
+
+      // 빅데이터 - 파이프 내 흐르는 입자
+      if (node.userData.flowParticles) {
+        node.userData.flowParticles.forEach(p => {
+          p.userData.t += 0.008;
+          if (p.userData.t > 1) p.userData.t = 0;
+          p.position.x = -0.3 + p.userData.t * 0.6;
+          p.position.y = 0;
+        });
+      }
+
+      // 양자 컴퓨팅 - 상태 벡터 세차운동 + 얽힌 큐비트
+      if (node.userData.stateVec && node.userData.stateTip) {
+        const theta = t * 0.8;
+        const phi = Math.PI / 3;
+        const r = 0.2;
+        const endX = r * Math.sin(phi) * Math.cos(theta);
+        const endY = r * Math.cos(phi);
+        const endZ = r * Math.sin(phi) * Math.sin(theta);
+        node.userData.stateTip.position.set(endX, endY, endZ);
+        // 벡터 라인은 중심에서 끝점까지
+        node.userData.stateVec.position.set(endX / 2, endY / 2, endZ / 2);
+        node.userData.stateVec.lookAt(endX, endY, endZ);
+        node.userData.stateVec.rotateX(Math.PI / 2);
+      }
+      if (node.userData.entangled) {
+        node.userData.entangled.rotation.x = t * 0.8;
+        node.userData.entangled.rotation.y = t * 0.6;
+      }
+
+      // 암호 수학 - 내부 링 회전 + 키 회전
+      if (node.userData.innerTicks) {
+        node.userData.innerTicks.rotation.z = t * 0.4;
+      }
+      if (node.userData.keyCenter) {
+        node.userData.keyCenter.rotation.y = t * 1.5;
+        node.userData.keyCenter.rotation.x = t * 0.8;
+      }
+
+      // 최적화 - 공이 경로를 따라 굴러감
+      if (node.userData.optBall && node.userData.optPath) {
+        const pathLen = node.userData.optPath.length;
+        const pos = (Math.sin(t * 0.6) * 0.5 + 0.5) * (pathLen - 1);
+        const idx = Math.floor(pos);
+        const frac = pos - idx;
+        if (idx < pathLen - 1) {
+          node.userData.optBall.position.lerpVectors(
+            node.userData.optPath[idx],
+            node.userData.optPath[idx + 1],
+            frac
+          );
+        }
+      }
+
+      // 기하학 - 회전
+      if (node.userData.geoShape) {
+        node.userData.geoShape.rotation.x = t * 0.3;
+        node.userData.geoShape.rotation.y = t * 0.5;
+      }
+
+      // 그래프 이론 - 노드 호흡
+      if (node.userData.graphNodes) {
+        node.userData.graphNodes.forEach(gn => {
+          gn.scale.setScalar(1 + Math.sin(t * 2 + gn.userData.phase) * 0.15);
+        });
+      }
+
+      // 표식 링 회전
+      if (node.userData.orbit) {
+        node.userData.orbit.rotation.z += 0.01;
+      }
+    });
+
+    connections.forEach(({ line, node }) => {
+      const p = node.userData.basePos;
+      const posAttr = line.geometry.attributes.position;
+      posAttr.array[3] = p.x;
+      posAttr.array[4] = p.y;
+      posAttr.array[5] = p.z;
+      posAttr.needsUpdate = true;
+      line.material.opacity = 0.12 + Math.sin(t * 2 + node.userData.phase) * 0.12;
+    });
+
+    pulses.forEach(pulse => {
+      pulse.userData.t += pulse.userData.speed * pulse.userData.direction;
+      if (pulse.userData.t > 1) {
+        pulse.userData.t = 0;
+        pulse.userData.target = Math.floor(Math.random() * nodes.length);
+      } else if (pulse.userData.t < 0) {
+        pulse.userData.t = 1;
+        pulse.userData.target = Math.floor(Math.random() * nodes.length);
+      }
+      const node = nodes[pulse.userData.target];
+      const endPos = node.getWorldPosition(tmpVec);
+      pulse.position.lerpVectors(hubWorld, endPos, pulse.userData.t);
+    });
+
+    bg.rotation.y = t * 0.01;
+    bg.rotation.x = t * 0.005;
+
+    // 호버 감지
+    raycaster.setFromCamera(mouseNDC, camera);
+    const hitTargets = nodes.map(n => n.userData.hit);
+    const intersects = raycaster.intersectObjects(hitTargets, false);
+    if (intersects.length > 0) {
+      const foundNode = nodes.find(n => n.userData.hit === intersects[0].object);
+      if (foundNode && foundNode !== hoveredNode) {
+        hoveredNode = foundNode;
+        label.textContent = foundNode.userData.name;
+        label.classList.add('show');
+      }
+    } else if (hoveredNode) {
+      hoveredNode = null;
+      label.classList.remove('show');
+    }
+
+    camera.position.x += (targetRotY * 1.5 - camera.position.x) * 0.02;
+    camera.position.y += (-targetRotX * 1.5 - camera.position.y) * 0.02;
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  // 우상단 표시
+  function pad(n, len = 2) { return String(n).padStart(len, '0'); }
+  setInterval(() => {
+    const now = new Date();
+    const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const rx = (rotX * 57.3).toFixed(1);
+    const ry = (rotY * 57.3).toFixed(1);
+    document.getElementById('coord').innerHTML =
+      `<span>${time} · </span><span style="color:rgba(100,200,255,0.7)">${rx}° / ${ry}°</span>`;
+  }, 100);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+
 </body>
 </html>
